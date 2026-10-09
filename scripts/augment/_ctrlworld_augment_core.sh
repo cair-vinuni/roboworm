@@ -1,7 +1,7 @@
 #!/bin/bash
 # Shared body for the three Ctrl-World multiview AUGMENT run scripts.
 #
-# NOT meant to be run directly — `scripts/run_{single_arm,bimanual,humanoid}_
+# NOT meant to be run directly — `scripts/run/ctrlworld/run_{single_arm,bimanual,humanoid}_
 # multiview_ctrlworld_augment.sh` set CONFIG_KEY (+ optionally SUBSET) and source
 # this. Keeping one body avoids the three wrappers drifting apart, since the only
 # real differences are the checkpoint, the prepared dataset dir and which infer
@@ -27,40 +27,41 @@ case "${CONFIG_KEY}" in
   ctrlworld_single_arm_multiview)
     EMBODIMENT=single_arm
     INFER="${ROOT}/scripts/augment/infer_single_arm_multiview_ctrlworld_augment.py"
-    CKPT="${CKPT:-${ROOT}/checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt}"
+    CKPT="${CKPT:-${ROOT}/checkpoints/base/ctrl_world/Ctrl-World/checkpoint-10000.pt}"
     # One prepared dir per category; the infer script appends it from --subset.
     DATASET_NAME=""
     CW_CONFIG=""
     ;;
+  # Legacy 3-view keys (bimanual/humanoid). Their launchers and finetuned
+  # checkpoints were removed on 2026-10-08; restore the ckpt from HF
+  # doanh25032004/vgp_exp_logs (checkpoints/CHECKPOINTS.md) to use them.
   ctrlworld_bimanual_multiview)
     EMBODIMENT=bimanual
     INFER="${ROOT}/scripts/augment/infer_bimanual_multiview_ctrlworld_augment.py"
-    CKPT="${CKPT:-${ROOT}/exp_logs/ctrlworld_logs/bimanual_multiview_5fps/checkpoint-280000.pt}"
+    CKPT="${CKPT:-${ROOT}/checkpoints/finetuned/ctrlworld/bimanual_multiview_5fps/checkpoint-280000.pt}"
     DATASET_NAME="${DATASET_NAME:-bimanual_multiview_5fps}"
     CW_CONFIG="${CONFIG:-bimanual}"
     ;;
   ctrlworld_humanoid_multiview)
     EMBODIMENT=humanoid
     INFER="${ROOT}/scripts/augment/infer_bimanual_multiview_ctrlworld_augment.py"
-    CKPT="${CKPT:-${ROOT}/exp_logs/ctrlworld_logs/humanoid_multiview/checkpoint-200000.pt}"
+    CKPT="${CKPT:-${ROOT}/checkpoints/finetuned/ctrlworld/humanoid_multiview/checkpoint-200000.pt}"
     DATASET_NAME="${DATASET_NAME:-humanoid_multiview}"
     CW_CONFIG="${CONFIG:-humanoid}"
     ;;
   ctrlworld_bimanual_multiview_4view_grid)
-    # Same recolor pipeline, a DIFFERENT finetuned checkpoint/config (4 views,
-    # 2x2 latent canvas) — dense keeps this as its own method dir alongside
-    # ctrlworld_bimanual_multiview, not a replacement (see
-    # .cursor/rules/ctrlworld-*-4view-grid-*-insights.mdc).
+    # Same recolor pipeline, the 4-view finetuned checkpoint/config (2x2 latent
+    # canvas); this is the bimanual paper cell (method dir ctrlworld_4view_grid).
     EMBODIMENT=bimanual
     INFER="${ROOT}/scripts/augment/infer_bimanual_multiview_ctrlworld_augment.py"
-    CKPT="${CKPT:-${ROOT}/exp_logs/ctrlworld_logs/bimanual_multiview_4view_grid/checkpoint-110000.pt}"
+    CKPT="${CKPT:-${ROOT}/checkpoints/finetuned/ctrlworld/bimanual_multiview_4view_grid/checkpoint-110000.pt}"
     DATASET_NAME="${DATASET_NAME:-bimanual_multiview_4view_grid}"
     CW_CONFIG="${CONFIG:-bimanual_grid}"
     ;;
   ctrlworld_humanoid_multiview_4view_grid)
     EMBODIMENT=humanoid
     INFER="${ROOT}/scripts/augment/infer_bimanual_multiview_ctrlworld_augment.py"
-    CKPT="${CKPT:-${ROOT}/exp_logs/ctrlworld_logs/humanoid_multiview_4view_grid/checkpoint-140000.pt}"
+    CKPT="${CKPT:-${ROOT}/checkpoints/finetuned/ctrlworld/humanoid_multiview_4view_grid/checkpoint-140000.pt}"
     DATASET_NAME="${DATASET_NAME:-humanoid_multiview_4view_grid}"
     CW_CONFIG="${CONFIG:-humanoid_grid}"
     ;;
@@ -85,8 +86,8 @@ DENSE_EXAMPLE_DIR="${DENSE_EXAMPLE_DIR:-${ROOT}/models/Ctrl-World/dataset_exampl
 AUGMENT_EXAMPLE_DIR="${AUGMENT_EXAMPLE_DIR:-${ROOT}/models/Ctrl-World/dataset_example_augment}"
 
 # --- Step 3 (infer) config --------------------------------------------------
-SVD_MODEL_PATH="${ROOT}/checkpoints/stabilityai/stable-video-diffusion-img2vid"
-CLIP_MODEL_PATH="${ROOT}/checkpoints/openai/clip-vit-base-patch32"
+SVD_MODEL_PATH="${ROOT}/checkpoints/base/stabilityai/stable-video-diffusion-img2vid"
+CLIP_MODEL_PATH="${ROOT}/checkpoints/base/openai/clip-vit-base-patch32"
 META_INFO="${ROOT}/models/Ctrl-World/dataset_meta_info"
 DOWN_SAMPLE="${DOWN_SAMPLE:-6}"
 

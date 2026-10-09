@@ -2,7 +2,7 @@
 # Shared body for the DreamGen AUGMENT run scripts (batch-json configs).
 #
 # NOT meant to be run directly — the wrappers
-#   scripts/run_{single_arm,bimanual}_{singleview,multiview}_dreamgen_augment.sh
+#   scripts/run/dreamgen/run_{single_arm,bimanual}_{singleview,multiview}_dreamgen_augment.sh
 # set CONFIG_KEY and source this. bimanual MULTIVIEW is NOT handled here: that
 # config uses the segment-rollout script, which reads the manifest itself, so it
 # has its own standalone runner.
@@ -50,7 +50,7 @@ case "${CONFIG_KEY}" in
   dreamgen_single_arm_singleview)
     # mirrors run_single_arm_singleview_dreamgen_static16fps.sh
     ENTRYPOINT=lvg
-    CKPT_BASE="${CKPT_BASE:-${ROOT}/exp_logs/dreamgen_logs/posttraining/singleview/single_arm_static_singleview_16fps_v2}"
+    CKPT_BASE="${CKPT_BASE:-${ROOT}/checkpoints/finetuned/dreamgen/posttraining/singleview/single_arm_static_singleview_16fps_v2}"
     CKPT_MODEL_DIR="${CKPT_BASE}/checkpoints_40_per/model"
     DEFAULT_ITER=iter_000090000
     ITER_SUFFIX=_static16fps
@@ -63,7 +63,7 @@ case "${CONFIG_KEY}" in
   dreamgen_bimanual_singleview)
     # mirrors run_bimanual_singleview_dreamgen_16fps.sh
     ENTRYPOINT=lvg
-    CKPT_BASE="${CKPT_BASE:-${ROOT}/exp_logs/dreamgen_logs/posttraining/singleview/bimanual_singleview_16fps}"
+    CKPT_BASE="${CKPT_BASE:-${ROOT}/checkpoints/finetuned/dreamgen/posttraining/singleview/bimanual_singleview_16fps}"
     CKPT_MODEL_DIR="${CKPT_BASE}/checkpoints_40_per/model"
     DEFAULT_ITER=iter_000110000
     ITER_SUFFIX=_bimanual16fps

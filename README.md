@@ -1,771 +1,492 @@
+<div align="center">
 
+<img src="docs/assets/figures/logo.png" alt="RoboWorM logo" width="96">
 
+# RoboWorM: Evaluating Movement Realism, Consistency and Acceleration Effects in Embodied Video World Models
 
+<!-- Paper badge hidden until the arXiv version is public:
+<a href="https://roboworm.github.io/roboworm/"><img src="https://img.shields.io/badge/cs.CV-Paper-b31b1b?logo=arxiv&logoColor=white&labelColor=555555" alt="Paper"></a>
+-->
+<a href="https://roboworm.github.io/roboworm/"><img src="https://img.shields.io/badge/RoboWorM-Website-4c9a2a?logo=googlechrome&logoColor=white&labelColor=555555" alt="Project page"></a>
+<a href="https://huggingface.co/datasets/doanh25032004/vgp_datasets"><img src="https://img.shields.io/badge/Dataset-Hugging%20Face-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="Dataset on Hugging Face"></a>
+<a href="https://huggingface.co/datasets/doanh25032004/video_gen_physics"><img src="https://img.shields.io/badge/Rollouts-Hugging%20Face-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="Rollouts on Hugging Face"></a>
+<a href="#citation"><img src="https://img.shields.io/badge/BibTeX-Cite-1f3a5f?labelColor=555555" alt="BibTeX"></a>
 
-# Video World — Training-Free Acceleration Benchmark
+<a href="https://roboworm.github.io/roboworm/#teaser"><img src="docs/assets/figures/teaser.jpg" alt="RoboWorM" width="90%"></a>
 
-Benchmarking training-free acceleration strategies (Cache, Sparse Attention, Token Merging) across CtrlWorld and DreamGen/DreamDojo on robotic manipulation tasks.
+</div>
 
-export PATH="$HOME/VLA/doanh:$PATH"
-gsutil -m cp -r gs://openpi-assets/checkpoints/pi05_droid/* /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/checkpoints/pi05_droid
-CUDA_VISIBLE_DEVICES=0 bash scripts/run_single_arm_multiview_ctrlworld_pi.sh both
-## Ctrl world
+Code, data pointers and run scripts for **RoboWorM**, a physics audit for robot video
+world models and the training-free methods that accelerate them. Interactive figures,
+tables and rollout videos are on the **[project page](https://roboworm.github.io/roboworm/)**.
 
-export CUDA_VISIBLE_DEVICES=0 
-export PYTHONPATH="./models/Ctrl-World" 
-python models/Ctrl-World/scripts/rollout_replay_traj.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt
+[![RoboWorM overview](docs/assets/figures/overview.png)](https://roboworm.github.io/roboworm/#abstract)
 
+*Benchmark overview: (a) episodes collected from 5 corpora, 3 embodiments, 1–4 views and
+two task horizons; (b) the physics audit with KIVA and RIGIS; (c) inference acceleration
+across 3 world models and 9 methods, about 29k rollouts.*
 
+RoboWorM tests action-/text-conditioned video world models on real robot episodes. It
+also tests whether training-free acceleration keeps the physics of the rollout intact.
 
-CUDA_VISIBLE_DEVICES=0 python scripts/rollout_key_board.py  --dataset_root_path dataset_example --dataset_meta_info_path dataset_meta_info --dataset_names droid_subset --svd_model_path ${path to svd folder} --clip_model_path /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/checkpoints/openai/clip-vit-base-patch32 --ckpt_path ${path to ctrl-world ckpt} --task_type keyboard --keyboard lllrrr
+- **Data**: 1,605 real episodes from **5 source corpora**: DROID, RoboChallenge,
+  AIST Bimanual, RoboCOIN and GR00T Teleop GR1. They cover **3 embodiments**
+  (single-arm, bimanual, humanoid), **1–4 synchronized views** and two task regimes,
+  **Markovian** and **non-Markovian**. On disk these are named `makovian` / `non_makovian`.
+- **World models (3)**: **DreamGen** (Cosmos-Predict2 2B / 14B DiT), **DreamDojo**
+  (2B action-conditioned DiT) and **Ctrl-World** (Stable Video Diffusion 1.5B U-Net).
+  Together they make 12 dense cells (listed in
+  [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md)). Ctrl-World uses 3 views on
+  single-arm and a 4-view 2×2 grid on bimanual and humanoid.
+- **Acceleration (9 + dense)**:
+  - feature caching: FasterCache, DiCache, WorldCache
+  - sparse attention: SVG1, SVG2, Radial, PISA
+  - token reduction: SiTo, ITM
+- **Metrics**:
+  - **KIVA**: intra-view kinematic stability (embodiment hallucination), reported as
+    excess over the real-video anchor.
+  - **RIGIS**: inter-view geometry and intrinsic/extrinsic stability (VGGT-Omega).
+  - **Visual Integrity**: CLIP-IQA+, p10 over frames.
+  - **Text Alignment**: CLIPScore.
+  - **FVD**: I3D, 16-frame windows at 5 fps, shared real pool.
+  - **PSNR / SSIM / LPIPS** against the paired dense rollout.
+- **Speedup**: the model's internal per-segment timer, divided by the timer of the
+  paired dense run (same episodes, same GPU).
 
+Rollout totals: 3,166 dense rollouts, and 29,343 including the accelerators
+([docs/datasets/cell_matrix.md](docs/datasets/cell_matrix.md)).
 
-### Default
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace
+[![Comparison with other benchmarks](docs/assets/figures/benchmark_comparison.png)](https://roboworm.github.io/roboworm/#related)
 
-### Use with Pisa
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_pisa --pisa_density 0.5 --pisa_block_size 32
+*How RoboWorM compares with existing video world model benchmarks on data diversity
+(samples, sources, morphologies, multi-view, long-horizon tasks) and evaluation dimensions
+(evaluator paradigm, cross-view geometry, speedup audit).*
 
-### Use-svg v1
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_svg --svg_pattern SVG1 --svg_sparsity 0.25
+[![Qualitative audit](docs/assets/figures/qualitative_audit.png)](https://roboworm.github.io/roboworm/#fig6)
 
-### Use-svg v2
-export VENV=/pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv
-export LD_LIBRARY_PATH=$VENV/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$VENV/lib/python3.10/site-packages/nvidia/cusparse/lib:$VENV/lib/python3.10/site-packages/torch/lib:$LD_LIBRARY_PATH
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_svg --svg_pattern SVG2 --svg_num_q_centroids 50 --svg_num_k_centroids 200
+*What the audit catches. (a) Hallucinated rollouts that VLM judges rate as good, while
+KIVA (single-view) and RIGIS (multi-view) agree with human raters that they are bad.
+(b) Dense vs. a well-tuned accelerator (2.1× faster, same score) vs. an over-accelerated
+one (2.9× faster, kinematics and geometry break). (c) KIVA degradation grows with rollout
+depth, from Markovian to non-Markovian tasks.*
 
+See the [project page](https://roboworm.github.io/roboworm/#fig6) for the rollout videos behind these examples.
 
-### use with radial attention (padding)
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_radial \
-  --radial_pad_small_layers 
+## Proposed metrics: KIVA and RIGIS
 
+RoboWorM introduces two VLM-free physics metrics. Both check a rollout against what is
+already known about the robot, its kinematic tree and its fixed camera rig, instead of
+asking a VLM judge.
 
-### use with radial attention (no padding)
+| metric | what it checks | README | setup guide |
+|---|---|---|---|
+| **KIVA** (Kinematic Invariant Violation Assessment) | Single view: a diffusion keypoint reader recovers 3-D robot keypoints from the pixels and measures link-rigidity error and joint jerk, calibrated against real footage. | [metrics/kiva/README.md](metrics/kiva/README.md) | [docs/metrics/kiva.md](docs/metrics/kiva.md) |
+| **RIGIS** (Robotic Inter-view Geometry & Intrinsic-Extrinsic Stability) | Multi view: VGGT-Ω lifts every view to depth + cameras and scores cross-view geometric consistency (S_geo) and camera-rig stability (S_pose). | [metrics/rigis/README.md](metrics/rigis/README.md) | [docs/metrics/rigis.md](docs/metrics/rigis.md) |
 
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_radial
+Latest metric updates:
 
+- **KIVA** ([#14](https://github.com/ltdoanhwork/video_gen_physics/pull/14)): two-command
+  CLI (`kinescore calibrate`, `kinescore score`) with fixed per-robot thresholds shipped in
+  [metrics/kiva/thresholds/](metrics/kiva/thresholds/). See
+  [metrics/kiva/README.md](metrics/kiva/README.md).
+- **RIGIS** ([#13](https://github.com/ltdoanhwork/video_gen_physics/pull/13)): rewritten
+  README (method, input format, model service + scoring commands) and a refactored
+  geometric-consistency scorer. See [metrics/rigis/README.md](metrics/rigis/README.md).
 
-### use with radial attention (no padding)
+The other metrics (Visual Integrity, Text Alignment, FVD, PSNR/SSIM/LPIPS) are listed in
+[6. Metrics](#6-metrics).
 
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_radial \
-  --radial_decay_factor 0.5 \
-  --radial_model_type hunyuan \
-  --radial_first_layers_fp 0
-## dreamgen base 
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0 
-export NUM_GPUS=1
-python -m scripts.prepare_batch_input_json \
-  --dataset_path ./datasets/dream_gen_benchmark/gr1_object \
-  --save_path ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_object \
-  --output_path ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_object/batch_input.json
+## Repository layout
 
-### dreamgen base - one gpu
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0 
-export NUM_GPUS=1
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS}
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0 
-export NUM_GPUS=1
-
-torchrun -m models.dreamgen.examples.video2world \
-  --model_size 14B \
-  --resolution 480 \
-  --fps 16 \
-  --dit_path ./checkpoints/nvidia/Cosmos-Predict2-14B-Video2World/model-480p-16fps.pt \
-  --batch_input_json /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/sampling_dataset/humanoid/singleview/input/PhysicalAI-Robotics-GR00T-GR1/dense/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS}
-
-# 14B Video2World 720p-16fps: ghi ra thư mục riêng (mặc định `720p_16fps/`), không đè `dense/`
-# (script tự clone batch_input.json và đổi `output_video`)
-bash ./scripts/run_humanoid_gr1_video2world_720p16fps.sh
-# Tuỳ chọn: OUT_TAG=my_run để tách từng lần chạy
-
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/sampling_dataset/humanoid/singleview/input/PhysicalAI-Robotics-GR00T-GR1/dense/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS}
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/sampling_dataset/humanoid/singleview/input/PhysicalAI-Robotics-GR00T-GR1/dense/batch_input.json \
-  --enable_prompt_refiner \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS}
-
-
-2B - 720P - prompt refinement
-
-14B - 480B - no prompt refinement
-
-
-
-### dreamgen base - 4 gpu
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0,1,2,3 
-export NUM_GPUS=4
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS}
-
-### dreamgen - pisa
-cd /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/methods/sparse_attention/piecewise-sparse-attention
-uv pip install -e .
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0 
-export NUM_GPUS=1
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_env/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_pisa \
-  --pisa_density 0.2 \
-  --pisa_block_size 64 \
-  --pisa_start_layer_idx 2
---> Total inference time: 414.5592 seconds
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0 
-export NUM_GPUS=1
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_env/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_pisa \
-  --pisa_density 0.05 \
-  --pisa_block_size 64 \
-  --pisa_start_layer_idx 0
---> Total inference time: 315.6579 seconds 
-
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0,1
-export NUM_GPUS=2
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_pisa \
-  --pisa_density 0.1 \
-  --pisa_block_size 64 \
-  --pisa_use_bias
-
-### dreamgen - radial
-Radial is not supported in the default `DreamDojo/.venv`. It requires a separate env with `flashinfer`.
-
-cd /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics
-bash ./scripts/bootstrap_radial_env.sh
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_object/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_radial \
-  --radial_decay_factor 1.0 \
-  --radial_block_size 64 \
-  --radial_start_layer_idx 4 \
-  --radial_model_type hunyuan
---> Total inference time: 397.3452 seconds 
-
-#### Quality-Focused Radial Configuration
-To improve generation quality (at the cost of a slightly longer inference time), you can increase the start layer index and change the mask profile to `wan` which has a larger attention window:
-
-```bash
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_object/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_radial \
-  --radial_decay_factor 1.0 \
-  --radial_block_size 64 \
-  --radial_start_layer_idx 8 \
-  --radial_model_type wan
 ```
---> Total inference time: 418.5359 seconds
-
-
-
-#### Tuning Radial Parameters
-- `--radial_start_layer_idx` (default: 4): The number of initial self-attention layers to compute exactly (no sparsity). **Increasing this (e.g. to 8 or 12)** is the most effective way to improve visual quality and object structure, as early layers are critical for forming the image.
-- `--radial_model_type` (default: `hunyuan`): The sparsity mask profile. Changing this to `wan` uses a larger attention window and sink, looking at more tokens and generally resulting in better quality.
-- `--radial_decay_factor` (default: 1.0): Controls how quickly the radial mask drops tokens. 
-- `--radial_block_size` (default: 64): Block size for sparse attention. Only `64` and `128` are supported. `64` is typically the best balance.
-
-### dreamgen - svg
-`SVG1` and `SVG2` have different environment requirements.
-
-`SVG1` can run in the default `DreamDojo/.venv` if that Torch build exposes `torch.nn.attention.flex_attention`.
-
-`SVG2` is not supported in the default `DreamDojo/.venv`. Use a separate env with `Sparse-VideoGen`, `flashinfer`, `cuvs`, and built SVG kernels.
-
-Do not install `cuvs-cu12` into `DreamDojo/.venv`. That env currently uses a Torch CUDA 12.8 stack, and `cuvs-cu12` upgrades parts of the CUDA userspace to 12.9, which breaks `torch` import with `libcusparse.so.12` / `libnvJitLink.so.12` symbol errors.
-
-cd /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics
-bash ./scripts/bootstrap_svg_env.sh
-
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-
-### dreamgen - svg1
-SVG1 uses DreamGen's `flex_attention + placement kernels` path. It does not require `flashinfer` or `cuvs`, but it does require a Torch build with `flex_attention`.
-
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_svg \
-  --svg_variant svg1 \
-  --svg_start_layer_idx 4 \
-  --svg_dense_step_frac 0.1 \
-  --svg_sparsity 0.25 \
-  --svg_num_sampled_rows 64 \
-  --svg_sample_mse_max_row 3000
-
-
-Speed-focused (max throughput, some quality loss):
-
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_svg \
-  --svg_variant svg1 \
-  --svg_start_layer_idx 4 \
-  --svg_dense_step_frac 0.05 \
-  --svg_sparsity 0.15 \
-  --svg_num_sampled_rows 16 \
-  --svg_sample_mse_max_row 1500
-
-Quality-focused (only SVG on spatially-local layers):
-
-
---svg_start_layer_idx 20 \
---svg_dense_step_frac 0.1 \
---svg_sparsity 0.25 \
---svg_num_sampled_rows 64 \
---svg_sample_mse_max_row 3000
-
-
-### dreamgen - svg2
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-
-torchrun --master_port=29601 -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_svg \
-  --svg_variant svg2 \
-  --svg_start_layer_idx 1 \
-  --svg_dense_step_frac 0.3 \
-  --svg_num_q_centroids 32 \
-  --svg_num_k_centroids 64 \
-  --svg_top_p_kmeans 0.9 \
-  --svg_min_kc_ratio 0.10 \
-  --svg_kmeans_iter_init 10 \
-  --svg_kmeans_iter_step 1
--->  Total inference time: 473.8372 seconds 
-
-torchrun --master_port=29601 -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_svg \
-  --svg_variant svg1 \
-  --svg_start_layer_idx 1 \
-  --svg_dense_step_frac 0.1 \
-  --svg_sparsity 0.15 \
-  --svg_num_sampled_rows 64 \
-  --svg_sample_mse_max_row 3000
---> Total inference time: 369.3853 seconds 
-
-torchrun --master_port=29601 -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_svg \
-  --svg_variant svg1 \
-  --svg_start_layer_idx 4 \
-  --svg_dense_step_frac 0.4 \
-  --svg_sparsity 0.25 \
-  --svg_num_sampled_rows 64 \
-  --svg_sample_mse_max_row 3000
-
-
-
-
-## dreamdojo
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/DreamDojo"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-python -m cosmos_predict2._src.predict2.inference.inference_batch \
-  --experiment "Stage-c_pt_4-reason_embeddings-v1p1-Index-26-Size-2B-Res-720-Fps-16-Note-T2V_high_sigma_loss_reweighted_1_1_rectified_flow_only_resume2" \
-  --ckpt_path ./checkpoints/dreamdojo/2B_pretrain/iter_000140000/model \
-  --batch_input ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.jsonl \
-  --output_dir ./output/dream_gen_benchmark/output_base_2b \
-  --resolution 480,640 \
-  --guidance 5 \
-  --num_output_frames 77 \
-  --num_steps 35 \
-  --use_neg_prompt
-
-
-
-
-export VIRTUAL_ENV="$PWD/.venv"
-export PATH="$VIRTUAL_ENV/bin:$PATH"
-hash -r
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/DreamDojo"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-cd /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics
-
-
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_hv_eval_2b_g1_gr1 \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/dreamdojo_GR1_robot_2b_g1_gr1 \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "/pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --checkpoint-interval 5000 \
-  --infinite
-
-### dreamdojo — humanoid singleview dense (full makovian + non_makovian)
-
-Dense = default action-conditioned diffusion (no `--use_svg` / SiTo). Outputs default to `sampling_dataset/dense/humanoid/output/singleview/dreamdojo/{makovian,non_makovian}/` (videos under `.../<iter_*>/`). The script runs `repair_humanoid_singleview_split_meta.py` first so `meta/episodes.jsonl` matches parquets when the split mixes DreamDojo-HV indices with GR1_robot (`SKIP_META_REPAIR=1` to skip).
-
-```bash
-cd /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics
-bash ./scripts/run_humanoid_singleview_dreamdojo_dense.sh
-# Tuỳ chọn: CHECKPOINTS_DIR=... SAVE_ROOT=/abs/path/to/out/root CUDA_VISIBLE_DEVICES=0 bash ...
+datasets/            source / training data (LeRobot) + prepared DreamGen corpora   -> HF vgp_datasets
+sampling_dataset/    benchmark rollouts {method}/{embodiment}/{input,output}/...    -> HF video_gen_physics
+checkpoints/         base/ (released weights), finetuned/ (ours), metrics/ (I3D, VGGT-Omega, ...)
+models/              dreamgen/ (Cosmos-Predict2), DreamDojo/, Ctrl-World/  (each with its own .venv)
+methods/             cache_strategy/{WorldCache,DiCache,FasterCache}, sparse_attention/{pisa,radial,svg},
+                     prunning/{SiTo,importance_token_merge}
+finetuning/          dreamgen/, dreamdojo/, ctrlworld/ training launchers + data prep
+scripts/             prepare/ infer/ run/{dreamgen,dreamdojo,ctrlworld}/ train/ metrics/ tables/ tools/
+metrics/             evaluate.py (CLI), kiva/, rigis/, fvd.py, clip_score.py, fidelity.py, quality/
+assets/              scripts/ (figure/table producers) + generated assets
+results/             metric outputs and report tables (not shipped; created on first run)
+docs/                setup, datasets, training, inference, acceleration, metrics, extending, assets/figures
 ```
 
-### dreamdojo svg 1
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_svg1_eval \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/svg1_results \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "./checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --use_svg \
-  --svg_variant svg1
+Docs index: [docs/README.md](docs/README.md). Script tree: [scripts/README.md](scripts/README.md).
 
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_svg1_eval \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/svg1_results \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "./checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --use_svg \
-  --svg_variant svg1 \
-  --svg_start_layer_idx 2 \
-  --svg_sparsity 0.2 \
-  --svg_dense_step_frac 0.1 \
-  --svg_start_layer_idx 4
+## 1. Environments
 
-### dreadojo svg2
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_svg2_eval \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/svg2_results \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "./checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --use_svg \
-  --svg_start_layer_idx 2 \
-  --svg_variant svg2
-
-
-cd /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_svg2_eval \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/svg2_results \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "./checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --use_svg \
-  --svg_variant svg2 \
-  --svg_start_layer_idx 18 \
-  --svg_num_q_centroids 8 \
-  --svg_num_k_centroids 16 \
-  --svg_top_p_kmeans 0.3 \
-  --svg_kmeans_iter_init 2 \
-  --svg_kmeans_iter_step 1
-
-### dreamgen - sito
-SiTo is inference-only, self-attention only, and single-GPU only in DreamGen v1.
+Clone with the submodules (WorldScore for the motion metrics, openpi for π0.5
+policy-in-the-loop, and the SVG kernel sources; see
+[docs/THIRD_PARTY.md](docs/THIRD_PARTY.md#fetching-the-submodules)):
 
 ```bash
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_sito \
-  --sito_start_layer_idx 6 \
-  --sito_keep_last_n_dense 2
+git clone --recursive https://github.com/ltdoanhwork/video_gen_physics.git
+# existing clone: git submodule update --init --recursive
 ```
 
-### dreamdojo - sito
-SiTo uses post-patchify per-frame token grouping. For the common `(4, 60, 80)` latent grid, the DiT sequence is `4 * 30 * 40 = 4800` tokens.
+There are six isolated environments, all built with [uv](https://docs.astral.sh/uv/)
+except KIVA's conda env. Never mix them; the launchers activate the right one
+themselves. The versions below were read from the cluster venvs. Exact install commands
+(CUDA wheel indexes, kernels that build with `--no-build-isolation`), notes and a
+verification snippet are in [docs/setup/README.md](docs/setup/README.md). `uv pip
+freeze` snapshots are in [docs/setup/env_freeze/](docs/setup/env_freeze/).
+
+| env | python | torch / CUDA | key extras | used for | build |
+|---|---|---|---|---|---|
+| `models/dreamgen/.venv` | 3.12 | 2.6.0 / cu124 | flash-attn 2.8.3, flashinfer 0.2.5, transformer-engine 2.14, piq, pyiqa, torchmetrics | DreamGen inference + training, every method except SVG2; `python -m metrics.evaluate` (fidelity, FVD, Visual Integrity, Text Alignment) | `env_freeze/dreamgen.txt` |
+| `models/dreamgen/.venv_svg` | 3.12 | 2.6.0 / cu124 | as above, but **flashinfer 0.3.1** | DreamGen **SVG2** only | `env_freeze/dreamgen__svg.txt` |
+| `models/DreamDojo/.venv` | 3.10 | 2.7.0 / cu128 | flash-attn 2.7.3, natten 0.21, transformer-engine 2.2, flashinfer 0.3.1 | DreamDojo inference + training, all methods | `uv sync --extra=cu128` in `models/DreamDojo` |
+| `models/Ctrl-World/.venv` | 3.10 | 2.7.1 / cu126 | diffusers 0.34, flashinfer 0.3.1 | Ctrl-World inference + training, all methods | `models/Ctrl-World/requirements.txt` + `env_freeze/Ctrl-World.txt` |
+| `metrics/rigis/.venv` | 3.13 | 2.14.1 / cu126 | VGGT-Omega, numba (added by `run.sh`) | RIGIS | `cd metrics/rigis && uv sync` |
+| `hdmi` conda env (`HAL_PYTHON`) | 3.10 | 2.7.0 / cu128 | transformers 5.2 (DINOv3), pytorch-kinematics | KIVA | `pip install -e "metrics/kiva[dino,video,bench]"` |
 
 ```bash
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_sito_eval \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/sito_results \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "./checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --use_sito \
-  --sito_start_layer_idx 4 \
-  --sito_keep_last_n_dense 2
+# example: the main DreamGen env (the other five are in docs/setup/README.md)
+uv venv --python 3.12 models/dreamgen/.venv && PY=models/dreamgen/.venv
+uv pip install --python $PY torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
+uv pip install --python $PY --no-build-isolation flash-attn==2.8.3 "transformer-engine[pytorch]==2.14.1"
+uv pip install --python $PY --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cu124 \
+    --extra-index-url https://flashinfer.ai/whl/cu124/torch2.6/ --extra-index-url https://pypi.nvidia.com \
+    -r docs/setup/env_freeze/dreamgen.txt
+$PY/bin/python -c "import torch, flash_attn, flashinfer; print(torch.__version__, torch.cuda.is_available(), flashinfer.__version__)"
 ```
 
-### ctrl-world - sito
-SiTo is applied only on large spatial self-attention layers in Ctrl-World.
+You also need **ffmpeg / ffprobe** on `PATH` (prepare scripts, GT rendering, RIGIS
+frame extraction, KIVA probing), and `export HF_HUB_DISABLE_XET=1` for every Hugging
+Face download on a parallel filesystem.
+
+## 2. Data
+
+[![Benchmark composition](docs/assets/figures/dataset_composition.png)](https://roboworm.github.io/roboworm/#benchmark)
+
+*Benchmark composition: 1,605 episodes split between Markovian and non-Markovian tasks,
+29,343 rollouts across dense and the three acceleration families, 5 robot platforms over
+3 embodiments, a range of manipulation skills, and the three world models with their
+conditioning (DreamGen: instruction + first frame; DreamDojo: autoregressive action
+chunks; Ctrl-World: multi-view, policy-in-the-loop with memory).*
 
 ```bash
-source /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/models/DreamDojo/.venv/bin/activate
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_sito \
-  --sito_max_downsample_ratio 4
+pip install -U "huggingface_hub[cli]"
+export HF_HUB_DISABLE_XET=1     # required on this cluster's parallel filesystem
 ```
 
-### itm
-ITM is inference-only, CFG-driven, and mutually exclusive with `SiTo`, `PISA`, `Radial`, `SVG`, and `NATTEN`.
-
-DreamGen:
+**Source / training data**: <https://huggingface.co/datasets/doanh25032004/vgp_datasets>
+(36.4 GB, LeRobot format), downloaded to `datasets/`:
 
 ```bash
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
-
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_itm \
-  --itm_start_layer_idx 6 \
-  --itm_keep_last_n_dense 2 \
-  --itm_prune_from_step 1 \
-  --itm_merge_from_step 2
+# LeRobot sources + the DreamGen training corpora
+hf download doanh25032004/vgp_datasets --repo-type dataset --local-dir datasets \
+    --include "single_arm/*" "bimanual/*" "humanoid/*" \
+              "single_arm_static_dreamgen_16fps/*" "bimanual_dreamgen_16fps/*" "humanoid_dreamgen_16fps/*" \
+              "bimanual_multiview_grid_seg16_dreamgen/*" "humanoid_multiview_grid_seg16_dreamgen/*"
+# one embodiment/view only
+hf download doanh25032004/vgp_datasets --repo-type dataset --local-dir datasets --include "humanoid/singleview/*"
 ```
 
-DreamDojo:
+**Benchmark rollouts**: <https://huggingface.co/datasets/doanh25032004/video_gen_physics>
+(178 GB, about 136k files), downloaded to `sampling_dataset/`. Paths follow the pattern
+`sampling_dataset/{method}/{embodiment}/{input,output}/{view}/{model}/{split}/...`, and
+`input/` exists only under `dense/`.
 
 ```bash
-python -m models.DreamDojo.examples.action_conditioned \
-  -o ./output/dreamdojo_itm_eval \
-  --checkpoints-dir ./checkpoints/dreamdojo/2B_GR1_post-train/iter_000050000 \
-  --experiment dreamdojo_2b_480_640_gr1 \
-  --save-dir ./output/dreamdojo_results/itm_results \
-  --num-frames 49 \
-  --num-samples 65 \
-  --dataset-path "./checkpoints/dreamdojo/datasets/PhysicalAI-Robotics-GR00T-Teleop-GR1/GR1_robot" \
-  --data-split test \
-  --deterministic-uniform-sampling \
-  --guidance 1.5 \
-  --use_itm \
-  --itm_start_layer_idx 4 \
-  --itm_keep_last_n_dense 2
+hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset            # all
+hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
+    --include "dense/*" "pisa/*"                                                                        # two methods
+hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
+    --include "*/bimanual/input/multiview/dreamgen/*" "*/bimanual/output/multiview/dreamgen/*"          # one cell
+hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
+    --include "data_for_web/*.json" "data_for_web/*.csv"                                                # human labels
 ```
 
-Ctrl-World:
+Details:
+- [docs/datasets/README.md](docs/datasets/README.md): corpora, layout, Markovian
+  labelling, and which variants are used.
+- [docs/datasets/sampling_dataset.md](docs/datasets/sampling_dataset.md): layout,
+  output conventions per model, and input builders per cell.
+
+### Where to put the downloads
+
+Every launcher, prepare script and metric runner resolves paths relative to the repo
+root, so run all downloads from the repo root with exactly these `--local-dir` targets.
+The three trees are gitignored; only `checkpoints/CHECKPOINTS.md` is tracked.
+
+| download | HF repo (type) | `--local-dir` | read by |
+|---|---|---|---|
+| source / training data | `doanh25032004/vgp_datasets` (dataset) | `datasets` | `scripts/run/*` (`--dataset-base datasets/<emb>/<view>`), `scripts/prepare/`, `finetuning/` |
+| benchmark rollouts | `doanh25032004/video_gen_physics` (dataset) | `sampling_dataset` | `metrics.evaluate`, `scripts/metrics/`, `assets/scripts/`; launchers write new rollouts here |
+| base weights | `doanh25032004/vgp_checkpoints_{nvidia,dreamdojo,google_t5}` (model) | `checkpoints/base/{nvidia,dreamdojo,google-t5}` | all model launchers |
+| other base + metric weights | `doanh25032004/vgp_checkpoints_own` (model) | `checkpoints`, then re-layout | Ctrl-World, FVD I3D, WorldScore probes (KIVA / RIGIS weights: see CHECKPOINTS.md, Metrics) |
+| our fine-tuned weights | `doanh25032004/vgp_exp_logs` (model) | `exp_logs`, then re-layout | every fine-tuned cell (`checkpoints/finetuned/...`) |
+
+The re-layout snippet for the last two rows is in
+[checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md#restore-from-huggingface). After it,
+the repo root looks like this:
+
+```
+datasets/
+  single_arm/{singleview,multiview}/{makovian,non_makovian}/        LeRobot: meta/ data/ videos/
+  bimanual/{singleview,multiview}/{makovian,non_makovian}/<task>/    one dir per task
+  humanoid/singleview/{makovian,non_makovian}/                       + captions/
+  humanoid/multiview/{makovian,non_makovian}/<task>/                 RoboCOIN tasks
+  single_arm_static_dreamgen_16fps/  bimanual_dreamgen_16fps/  humanoid_dreamgen_16fps/
+  bimanual_multiview_grid_seg16_dreamgen/  humanoid_multiview_grid_seg16_dreamgen/
+                                                                     DreamGen training corpora: videos/ metas/ t5_xxl/
+sampling_dataset/
+  {method}/{embodiment}/{input,output}/{view}/{model}/{split}/...    input/ only under dense/
+  data_for_web/                                                      human labels + catalog
+checkpoints/
+  base/{nvidia,dreamdojo,google-t5,ctrl_world,stabilityai,openai,pi05_droid,meta-llama,droid,mjcf,...}
+  finetuned/{ctrlworld,dreamdojo,dreamgen}/
+  metrics/{fvd,worldscore,vggt_omega,kiva}/
+```
+
+`hf download` is the current name of `huggingface-cli download`; both take the same
+arguments. Keep `export HF_HUB_DISABLE_XET=1` set for every download (the Xet backend
+fails on parallel filesystems). Quick sanity check after downloading:
 
 ```bash
-export PYTHONPATH="./models/Ctrl-World"
-CUDA_VISIBLE_DEVICES=0 XLA_PYTHON_CLIENT_MEM_FRACTION=0.4 python models/Ctrl-World/scripts/rollout_interact_pi.py \
-  --dataset_root_path ./models/Ctrl-World/dataset_example \
-  --dataset_meta_info_path ./models/Ctrl-World/dataset_meta_info \
-  --dataset_names ./models/Ctrl-World/droid_subset \
-  --svd_model_path ./checkpoints/stabilityai/stable-video-diffusion-img2vid \
-  --clip_model_path ./checkpoints/openai/clip-vit-base-patch32 \
-  --ckpt_path ./checkpoints/ctrl_world/Ctrl-World/checkpoint-10000.pt \
-  --task_type pickplace \
-  --use_itm \
-  --itm_max_downsample_ratio 4
+ls datasets/humanoid/singleview/makovian/meta            # info.json episodes.jsonl tasks.jsonl ...
+ls datasets/bimanual/multiview/makovian | head -3          # close_cardboard_box close_toolbox ...
+ls sampling_dataset/dense/humanoid/output/singleview/dreamgen   # makovian non_makovian
+ls checkpoints/base checkpoints/finetuned checkpoints/metrics
 ```
 
+Metric outputs and report tables are written to `results/` (gitignored, created on first run).
 
+## 3. Checkpoints
 
-## Sparse Attention Benchmark Scripts (SiTo & ITM)
-
-These scripts run inference with sparse attention methods and save results to `sampling_dataset/{sito,itm}/` for the webpage demo.
-
-### Humanoid Singleview
+[checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md) lists the checkpoint of every
+dense cell (path, size, step) together with the base and metric weights. To restore from
+the HF model repos `doanh25032004/vgp_checkpoints_{nvidia,dreamdojo,google_t5,own}`:
 
 ```bash
-# DreamDojo + SiTo (2B, action-conditioned)
-bash scripts/run_humanoid_singleview_dreamdojo_sito.sh
-
-# DreamDojo + ITM (2B, action-conditioned)
-bash scripts/run_humanoid_singleview_dreamdojo_itm.sh
-
-# DreamGen + SiTo (14B, video2world)
-bash scripts/run_humanoid_singleview_dreamgen_sito.sh
-
-# DreamGen + ITM (14B, video2world)
-bash scripts/run_humanoid_singleview_dreamgen_itm.sh
+export HF_HUB_DISABLE_XET=1
+hf download doanh25032004/vgp_checkpoints_nvidia    --repo-type model --local-dir checkpoints/base/nvidia
+hf download doanh25032004/vgp_checkpoints_dreamdojo --repo-type model --local-dir checkpoints/base/dreamdojo
+hf download doanh25032004/vgp_checkpoints_google_t5 --repo-type model --local-dir checkpoints/base/google-t5
+hf download doanh25032004/vgp_checkpoints_own       --repo-type model --local-dir checkpoints   # then re-layout, see CHECKPOINTS.md
 ```
 
-### Ctrl-World + SiTo / ITM (Single-Arm Multiview)
+The full backup / restore recipe and its gotchas are in
+[docs/setup/hf_backup_restore.md](docs/setup/hf_backup_restore.md).
+
+## 4. Training (optional: fine-tuned checkpoints are released)
+
+Three cells use released weights:
+- Ctrl-World single-arm
+- DreamGen 14B single-arm MV
+- DreamDojo GR1
+
+The other 9 checkpoints were post-trained. Each one was trained on exactly one prepared
+input, built by the prepare script below from the LeRobot sources in `datasets/`:
+
+| checkpoint (`checkpoints/finetuned/...`) | prepare script | training input |
+|---|---|---|
+| `ctrlworld/bimanual_multiview_4view_grid/checkpoint-110000.pt` | `scripts/prepare/prepare_ctrlworld_bimanual_multiview_grid.py` + meta builder | `models/Ctrl-World/dataset_example/bimanual_multiview_4view_grid/` |
+| `ctrlworld/humanoid_multiview_4view_grid/checkpoint-140000.pt` | `scripts/prepare/prepare_ctrlworld_humanoid_multiview_grid.py` + meta builder | `models/Ctrl-World/dataset_example/humanoid_multiview_4view_grid/` |
+| `dreamgen/.../multiview/bimanual_multiview_seg16/.../iter_000120000.pt` | `finetuning/dreamgen/scripts/prepare_bimanual_multiview_grid_dreamgen.py` → `segment_bimanual_multiview_grid_dreamgen.py` → T5 → `reencode_bimanual_multiview_seg_16fps.py` | `datasets/bimanual_multiview_grid_seg16_dreamgen/` |
+| `dreamgen/.../multiview/humanoid_multiview_seg16/.../iter_000100000.pt` | `finetuning/dreamgen/scripts/prepare_humanoid_multiview_grid_dreamgen.py` → `segment_humanoid_multiview_grid_dreamgen.py` → T5 → `reencode_humanoid_multiview_seg_16fps.py` | `datasets/humanoid_multiview_grid_seg16_dreamgen/` |
+| `dreamgen/.../singleview/single_arm_static_singleview_16fps_v2/.../iter_000090000.pt` | `finetuning/dreamgen/scripts/prepare_single_arm_robochallenge_dreamgen_16fps.py` + T5 | `datasets/single_arm_static_dreamgen_16fps/` |
+| `dreamgen/.../singleview/bimanual_singleview_16fps/.../iter_000110000.pt` | `finetuning/dreamgen/scripts/prepare_bimanual_dreamgen_16fps.py` + T5 | `datasets/bimanual_dreamgen_16fps/` |
+| `dreamgen/.../singleview/humanoid_singleview_16fps/.../iter_000090000.pt` | `scripts/tools/data/run_caption_humanoid_singleview.sh` → `finetuning/dreamgen/scripts/prepare_humanoid_dreamgen_16fps.py` + T5 | `datasets/humanoid_dreamgen_16fps/` |
+| `dreamdojo/.../exp_single_arm_sv/single_arm_singleview/checkpoints/iter_000030000` | none (`MultiVideoActionDataset` reads LeRobot directly) | `datasets/single_arm/singleview/` |
+| `dreamdojo/.../exp_aloha_resume70k/aloha_bimanual_singleview_full/checkpoints/iter_000100000` | none (`MultiVideoActionDataset`) | `datasets/bimanual/singleview/` |
+
+The full table (launchers, configs, warm starts, the 3 released checkpoints) is in
+[docs/training/README.md](docs/training/README.md). Representative commands:
 
 ```bash
-# Ctrl-World + SiTo
-bash scripts/run_single_arm_multiview_ctrlworld_sito.sh [makovian|non_makovian|both]
-
-# Ctrl-World + ITM
-bash scripts/run_single_arm_multiview_ctrlworld_itm.sh [makovian|non_makovian|both]
+# DreamGen 2B (models/dreamgen/.venv): prepare -> T5 -> launch, one script per checkpoint
+NPROC=4 bash finetuning/dreamgen/train_bimanual_16fps.sh                     # bimanual SV
+SKIP_REENCODE=1 NPROC=4 bash finetuning/dreamgen/train_bimanual_multiview_grid_16fps.sh   # bimanual MV 2x2
+# DreamDojo 2B (models/DreamDojo/.venv)
+NPROC=2 bash finetuning/dreamdojo/launch.sh dreamdojo_2b_480_640_single_arm_sv
+# Ctrl-World (models/Ctrl-World/.venv): encode latents -> meta -> accelerate train
+NPROC=4 bash scripts/train/run_humanoid_multiview_ctrlworld_train_4view_grid.sh
 ```
 
-### Single-Arm Singleview (DreamDojo)
+## 5. Dense and accelerated rollouts
+
+Launchers live in `scripts/run/{dreamgen,dreamdojo,ctrlworld}/`. They are resumable,
+discover episodes automatically, and write to `sampling_dataset/<method>/...`. Each
+accelerated launcher is identical to the dense launcher of its cell except for the
+method flags. The full table of 12 dense launchers and the method knobs is in
+[docs/inference/README.md](docs/inference/README.md).
+Per-method details and the full (cell × method) config matrix: [docs/acceleration/](docs/acceleration/README.md).
 
 ```bash
-# DreamDojo + SiTo
-bash scripts/run_single_arm_singleview_dreamdojo_sito.sh
+# DreamGen
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_full.sh           # dense
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_dicache.sh        # DiCache
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_pisa.sh           # PISA
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_svg2.sh           # SVG2 (.venv_svg)
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_single_arm_singleview_dreamgen_sito.sh        # SiTo
 
-# DreamDojo + ITM
-bash scripts/run_single_arm_singleview_dreamdojo_itm.sh
+# DreamDojo
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamdojo/run_humanoid_singleview_dreamdojo_full_episode.sh   # dense
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamdojo/run_humanoid_singleview_dreamdojo_all_methods.sh    # all 9 methods
+
+# Ctrl-World
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/ctrlworld/run_bimanual_multiview_ctrlworld_4view_grid.sh             # dense
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/ctrlworld/run_bimanual_multiview_ctrlworld_4view_grid_worldcache.sh  # WorldCache
+CUDA_VISIBLE_DEVICES=0 bash scripts/run/ctrlworld/run_single_arm_multiview_ctrlworld_itm.sh                  # ITM
 ```
 
-### Collecting Videos for Webpage
+Launcher names follow the pattern
+`scripts/run/<family>/run_<embodiment>_<view>_<model>[_4view_grid]_<method>.sh`.
+For trial runs, send output to a scratch tree with `SAVE_ROOT` / `OUTPUT_ROOT`.
 
-After inference, the videos are automatically served by the webpage via symlink:
+[![Dense world-model results](docs/assets/figures/dense_results.png)](https://roboworm.github.io/roboworm/#models)
+
+*Dense (non-accelerated) results for every cell, split into Markovian and non-Markovian
+tasks: visual integrity, PSNR, text alignment, FVD and the physical audit (RIGIS for
+multi-view tracks, KIVA for single-view tracks). Ctrl-World leads on multi-view, DreamDojo
+on most single-view settings. Interactive tables:
+[project page](https://roboworm.github.io/roboworm/#models).*
+
+### Speedup measurement
+
+Speedup is the dense time divided by the method time, measured with each model's
+internal per-segment timer on the same episodes and GPU:
+- DreamGen: `Total inference time`
+- DreamDojo: `[Timing] Generated`
+- Ctrl-World: `wall_time_s`
+
 ```bash
-# webpage/videos -> ../sampling_dataset (already linked)
-# Videos accessible at: webpage/videos/{sito,itm}/{embodiment}/output/...
-
-# Or explicitly check what's available:
-python scripts/collect_sparse_attention_videos.py --dry-run
+bash scripts/tools/tune/_bench_uniform_timing.sh --estimate
+bash scripts/tools/tune/_bench_uniform_timing.sh --all --gpu 0          # or --cell dreamdojo_humanoid_sv
+models/dreamgen/.venv/bin/python assets/scripts/merge_timing_shards.py    # -> results/reports/speedup_perchunk.csv
+models/dreamgen/.venv/bin/python assets/scripts/make_timing_pass_table.py # -> results/reports/timing_pass.{json,csv}
+models/dreamgen/.venv/bin/python scripts/tables/make_speedup_summary.py --sampling-root sampling_dataset --out-dir results/reports
 ```
 
----
+[![Speedup vs physical audit](docs/assets/figures/speedup_tradeoff.png)](https://roboworm.github.io/roboworm/#acceleration)
 
-python -m models.dreamgen.scripts.prepare_batch_input_json \
-  --dataset_path /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/datasets/dream_gen_benchmark/gr1_behavior \
-  --save_path /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/output/dreamgen_lvg/2b_behaviour \
-  --output_path /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/output/dreamgen_lvg/2b_behaviour/batch_input.json
+*Speed–quality trade-off of every method on the bimanual cells. Bars show the speedup over
+the paired dense rollout, the right axis shows the physical audit (RIGIS for multi-view,
+KIVA for single-view), and boxed values show aggregate quality retention. Caching gives
+the largest speedups with near-zero degradation; token pruning degrades the most.*
 
-export PYTHONPATH="./models/dreamgen"
-export NUM_GPUS=2
+Per-embodiment trade-off plots (humanoid, single-arm) are on the [project page](https://roboworm.github.io/roboworm/#acceleration).
 
-torchrun --nproc_per_node=${NUM_GPUS} -m models.dreamgen.examples.video2world_lvg \
-  --model_size 2B \
-  --batch_input_json /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/output/dreamgen_lvg/2b_behaviour/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS}
+## 6. Metrics
 
+The CLI is `python -m metrics.evaluate`. The registry and options are documented in
+[metrics/README.md](metrics/README.md), and the evaluation protocol in
+[docs/metrics/README.md](docs/metrics/README.md).
 
+[![KIVA and RIGIS](docs/assets/figures/kiva_rigis.png)](https://roboworm.github.io/roboworm/#method)
 
-torchrun -m models.dreamgen.examples.video2world_gr00t_lvg \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --num_chunks 3 \
-  --num_conditional_frames 1
+*The two physical audits. (a) KIVA: a shared video-conditioned reader trained on
+forward-kinematics targets; five denoised candidates are averaged before rigidity and jerk
+are measured and calibrated against real-video references. (b) RIGIS: VGGT-Ω estimates
+depth and cameras to score geometric consistency and camera-pose stability across views.*
 
-### dreamgen - multiview
+[![KIVA / RIGIS vs VLM judges](docs/assets/figures/metrics_vs_judges.png)](https://roboworm.github.io/roboworm/#results)
 
+*KIVA (top) and RIGIS (bottom) against four VLM judges, zero-shot and with
+chain-of-thought: correlation and accuracy with human scores, and latency per video second.*
 
+Interactive KIVA / RIGIS demos and the human-alignment analysis: [project page](https://roboworm.github.io/roboworm/#kiva).
 
-export PYTHONPATH="./models/dreamgen"
-export CUDA_VISIBLE_DEVICES=0
-export NUM_GPUS=1
+```bash
+PY=models/dreamgen/.venv/bin/python; export HF_HUB_OFFLINE=1
+CELL=sampling_dataset/dense/single_arm/output/singleview/dreamgen/makovian
+$PY -m metrics.evaluate --pred-root $CELL --metrics fidelity clip_score --out results/metrics/sa_sv_mk
+$PY -m metrics.evaluate --pred-root $CELL --metrics fvd                 --out results/metrics/sa_sv_mk_fvd
+$PY -m metrics.evaluate --pred-root $CELL --metrics kiva --opt kiva.embodiment=single_arm \
+    --opt kiva.score_ref=true --out results/metrics/sa_sv_mk_kiva
 
-torchrun -m models.dreamgen.examples.video2world_gr00t \
-  --model_size 14B \
-  --gr00t_variant gr1 \
-  --batch_input_json ./output/dream_gen_benchmark/cosmos_predict2_14b_gr1_behavior/batch_input.json \
-  --disable_guardrail \
-  --num_gpus ${NUM_GPUS} \
-  --use_itm \
-  --itm_start_layer_idx 6 \
-  --itm_keep_last_n_dense 2 \
-  --itm_prune_from_step 1 \
-  --itm_merge_from_step 2
+# full-benchmark sweeps
+ROLE=gt bash metrics/kiva/run.sh --tmux && bash metrics/kiva/run.sh --tmux          # KIVA   -> results/hallucination/
+bash metrics/rigis/run.sh --tmux                                                    # RIGIS  -> results/multiview_consistency/
+bash scripts/metrics/run_dense_nr.sh                                                # Visual Integrity + Text Alignment
+MACHINES=1 bash scripts/metrics/run_dr_metrics.sh 0                                 # PSNR/SSIM/LPIPS/FVD vs dense
+```
 
+Two protocol rules matter when comparing numbers:
+- Fidelity is always measured against the **dense prediction** of the same episode,
+  never against GT.
+- Multiview FVD uses a **shared per-camera real pool**.
 
-TMP_OUT=/pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/tmp \
-NUM_GPUS=1 \
-BATCH_JSON=./sampling_dataset/dense/single_arm/input/multiview/dreamgen/makovian/batch_input.json \
-bash scripts/run_single_arm_multiview_video2world_2b_tmp.sh
+## 7. Extending RoboWorM
 
-Successfully saved prompt file to: /pfss/mlde/workspaces/mlde_wsp_IAS_SAMMerge/VLA/doanh/video_world/video_gen_physics/sampling_dataset/humanoid/multiview/non_makovian/dreamgen/Airbot_MMK2_Airbot_MMK2_storage_mango_pomegranate/episode_000002.txt
+The benchmark can be extended along three axes: a new world model, a new embodiment /
+dataset, or a new fast-inference method. A new entrant is directly comparable to every
+existing number, because metrics are stored per clip and paired only when results are
+aggregated, so nothing already in the benchmark is re-scored.
+Guides, grounded in the code: [docs/extending/](docs/extending/README.md).
+
+[![Extending RoboWorM](docs/assets/figures/extending.png)](docs/extending/README.md)
+
+*The three extension paths. (A) A new world model: fine-tune on the released corpus, run
+the benchmark grid, score with the existing metrics (a new row). (B) A new embodiment
+dataset: register it, prepare prompts/actions/video, fine-tune the backbones, and add a
+KIVA keypoint reader and a RIGIS camera setup (a new column). (C) A new acceleration
+method: plug it into the existing models, run the grid, and measure its speed–quality
+trade-off against dense.*
+
+| add | what it takes | guide |
+|---|---|---|
+| a world model (a new row) | fine-tune on the released corpus; `prepare` → `infer` → `run` scripts writing `sampling_dataset/dense/...`; score with the existing metrics | [new_world_model.md](docs/extending/new_world_model.md) |
+| an embodiment / dataset (a new column) | LeRobot corpus, regime + taxonomy labels, camera mounts; fine-tune each backbone; a KIVA keypoint reader with real-segment thresholds, a RIGIS view pair, an FVD real pool | [new_embodiment_dataset.md](docs/extending/new_embodiment_dataset.md) |
+| an acceleration method | `add_<method>_args` + enable hook in `methods/<family>/`; one launcher per cell mirroring dense; per-cell knee; matched dense timing | [new_acceleration_method.md](docs/extending/new_acceleration_method.md) |
+| a metric | a `BaseMetric` subclass registered in `metrics/registry.py`, run by `python -m metrics.evaluate` | [new_metric.md](docs/extending/new_metric.md) |
+
+Setup of the two physical audits: [docs/metrics/kiva.md](docs/metrics/kiva.md),
+[docs/metrics/rigis.md](docs/metrics/rigis.md).
+
+## Citation
+
+```bibtex
+@inproceedings{roboworm2027,
+  title     = {RoboWorM: Evaluating Movement Realism, Consistency and Acceleration Effects in Embodied Video World Models},
+  author    = {Anonymous},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2027},
+  note      = {Under review},
+  url       = {https://roboworm.github.io/roboworm/}
+}
+```
+
+## License
+
+RoboWorM's own code is released under the [Apache License 2.0](LICENSE) (see also
+[NOTICE](NOTICE)). Third-party code under `models/`, `methods/` and `metrics/` keeps its
+own license, listed below and in [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md). VGGT-Omega
+(FAIR Noncommercial), DINOv3 (DINOv3 License) and pyiqa (PolyForm Noncommercial) are
+non-commercial only, so the full pipeline is for non-commercial research. FasterCache and
+SiTo declare no upstream license. Datasets and rollouts on Hugging Face follow the
+licenses of their source corpora.
+
+## Acknowledgements
+
+RoboWorM builds on the code of many projects. Each project keeps its own license, and
+its LICENSE file stays in the vendored directory. Paths, commits, our changes and the
+license-file locations are listed in [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md).
+Dataset licenses follow the source corpora: DROID, RoboChallenge, AIST Bimanual,
+RoboCOIN and GR00T Teleop GR1.
+
+| role | project | license | in this repo |
+|---|---|---|---|
+| world model | [Cosmos-Predict2](https://github.com/nvidia-cosmos/cosmos-predict2) / [GR00T Dreams](https://github.com/NVIDIA/GR00T-Dreams) | Apache-2.0 | `models/dreamgen/` |
+| world model | [DreamDojo](https://github.com/NVIDIA/DreamDojo) | Apache-2.0 | `models/DreamDojo/` |
+| world model | [Ctrl-World](https://github.com/Robert-gyj/Ctrl-World) (+ [diffusers](https://github.com/huggingface/diffusers) SVD pipeline) | MIT (Apache-2.0) | `models/Ctrl-World/` |
+| policy | [openpi](https://github.com/Physical-Intelligence/openpi) | Apache-2.0 | `models/Ctrl-World/openpi` (submodule) |
+| caching | [FasterCache](https://github.com/Vchitect/FasterCache) | none declared | `methods/cache_strategy/FasterCache/` |
+| caching | [DiCache](https://github.com/Bujiazi/DiCache), [WorldCache](https://github.com/umair1221/WorldCache) | re-implemented | `methods/cache_strategy/{DiCache,WorldCache}/` |
+| sparse attention | [Sparse VideoGen 1/2](https://github.com/svg-project/Sparse-VideoGen) (+ CUTLASS, FlashInfer, pybind11) | Apache-2.0 | `methods/sparse_attention/Sparse-VideoGen/` |
+| sparse attention | [Radial Attention](https://github.com/mit-han-lab/radial-attention) | Apache-2.0 | `methods/sparse_attention/radial-attention/` |
+| sparse attention | [PISA](https://github.com/xie-lab-ml/piecewise-sparse-attention) | MIT | `methods/sparse_attention/piecewise-sparse-attention/` |
+| token reduction | [SiTo](https://github.com/EvelynZhang-epiclab/SiTo) (on [ToMeSD](https://github.com/dbolya/tomesd), MIT) | none declared | `methods/prunning/SiTo/` |
+| token reduction | [Importance-Based Token Merging](https://github.com/cvlab-stonybrook/importance-token-merge) | MIT | `methods/prunning/importance-token-merge/` |
+| RIGIS | [VGGT-Omega](https://github.com/facebookresearch/vggt-omega) | FAIR Noncommercial Research | `metrics/rigis/vggt_omega/` |
+| KIVA | [DINOv3](https://github.com/facebookresearch/dinov3), [pytorch-kinematics](https://github.com/UM-ARM-Lab/pytorch_kinematics), [robot_descriptions](https://github.com/robot-descriptions/robot_descriptions.py) | DINOv3 License, MIT, Apache-2.0 | pip / HF weights |
+| motion metrics | [WorldScore](https://github.com/haoyi-duan/WorldScore) with [SEA-RAFT](https://github.com/princeton-vl/SEA-RAFT), [VFIMamba](https://github.com/MCG-NJU/VFIMamba), [GroundingDINO](https://github.com/IDEA-Research/GroundingDINO), [SAM 2](https://github.com/facebookresearch/sam2) | MIT, BSD-3, Apache-2.0 | `metrics/WorldScore` (submodule) |
+| Visual Integrity | CLIP-IQA+ via [pyiqa](https://github.com/chaofengc/IQA-PyTorch) | PolyForm Noncommercial 1.0.0 | pip |
+| Text Alignment | CLIPScore via [torchmetrics](https://github.com/Lightning-AI/torchmetrics) + [CLIP](https://github.com/openai/CLIP) | Apache-2.0, MIT | pip |
+| fidelity, FVD | [piq](https://github.com/photosynthesis-team/piq) ([LPIPS](https://github.com/richzhang/PerceptualSimilarity)), [I3D](https://github.com/google-deepmind/kinetics-i3d) via [StyleGAN-V](https://github.com/universome/stylegan-v) export | Apache-2.0, BSD-2 | pip / `checkpoints/metrics/fvd/` |
+
+Motion Amplitude (RBench) and FVD are re-implemented from their papers.

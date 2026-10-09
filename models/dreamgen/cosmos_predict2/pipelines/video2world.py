@@ -57,11 +57,14 @@ from imaginaire.utils.ema import FastEmaModelUpdater
 from methods.cache_strategy.common import reset_cache_runtime
 from methods.prunning.importance_token_merge.runtime import build_itm_attention_context, compute_itm_heat_map
 from methods.cache_strategy.common import (
+    BSCConfig,
+    BWCacheConfig,
     CacheRuntimeConfig,
     WorldCacheConfig,
     DiCacheConfig,
     FasterCacheConfig,
     ScalingCacheConfig,
+    RFCacheConfig,
     get_cache_backend_name,
     reset_cache_runtime,
 )
@@ -460,6 +463,53 @@ class Video2WorldPipeline(BasePipeline):
 
             log.info("[ScalingCache] Applying ScalingCache runtime from AM_DiT/src/scl")
             return apply_scalingcache(net, self.cache_config)
+        if isinstance(self.cache_config, RFCacheConfig):
+            # RFC (ICLR 2026): runtime AM_DiT/methods/cache_strategy/RFC/dit.py, DreamGen
+            # adapter .../RFC/dreamgen.py, reached via AM_DiT/src (rfcache.backend).
+            from rfcache.backend import apply_rfc
+
+            log.info(
+                f"[RFC] Applying RFC runtime from AM_DiT: tau={self.cache_config.tau} "
+                f"max_order={self.cache_config.max_order} "
+                f"first_enhance={self.cache_config.first_enhance} (denoise steps)")
+            return apply_rfc(net, self.cache_config)
+        if isinstance(self.cache_config, BWCacheConfig):
+            # BWCache: runtime AM_DiT/methods/cache_strategy/BWCache/dit.py, DreamGen adapter
+            # .../BWCache/dreamgen.py, reached via AM_DiT/src (bwcache.backend).
+            from bwcache.backend import apply_bwcache
+
+            log.info(
+                f"[BWCache] Applying BWCache runtime from AM_DiT: "
+                f"thresh={self.cache_config.rel_l1_thresh} "
+                f"reuse_interval={self.cache_config.reuse_interval} "
+                f"last_step={self.cache_config.last_step} "
+                f"warmup={self.cache_config.warmup_steps} (denoise steps)")
+            return apply_bwcache(net, self.cache_config)
+        if isinstance(self.cache_config, BSCConfig):
+            # BSC is ours: algorithm core in AM_DiT/src/bsc, DiT adaptation in
+            # AM_DiT/methods/cache_strategy/BSC. Same route as ScalingCache above --
+            # AM_DiT/src is on this process's PYTHONPATH, its root is not.
+            #
+            # Unlike the step-level backends, BSC patches net.blocks AND wraps net.forward
+            # to advance its own step counter (this pipeline never tells a backend when a
+            # denoise step begins). The per-episode reset is wired through
+            # `reset_cache_runtime`, which __call__ already invokes per chunk.
+            from bsc.backend import apply_bsc
+
+            # loguru's `log.info` takes ONE already-formatted message -- it is not
+            # stdlib logging, so the `("...%s", a, b)` form raises TypeError. Every
+            # other branch above passes a single literal string and so never hit this;
+            # this branch was written with %s args and had never executed (AM_DiT
+            # docs/INSIGHTS.md section 52), so the very first GPU run died here, after
+            # loading the checkpoint and before a single denoise step.
+            log.info(
+                f"[BSC] Applying BSC runtime from AM_DiT: "
+                f"gate={self.cache_config.gate_mode} tau={self.cache_config.rcs_threshold} "
+                f"mfi={self.cache_config.min_full_interval} (net forwards) "
+                f"group={self.cache_config.group_size} "
+                f"predict={self.cache_config.group_predict} "
+                f"predictor={self.cache_config.predictor_mode}")
+            return apply_bsc(net, self.cache_config)
 
         raise TypeError(f"Unsupported cache config type: {type(self.cache_config)!r}")
 
