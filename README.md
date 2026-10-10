@@ -315,6 +315,7 @@ accelerated launcher is identical to the dense launcher of its cell except for t
 method flags. The full table of 12 dense launchers and the method knobs is in
 [docs/inference/README.md](docs/inference/README.md).
 Per-method details and the full (cell × method) config matrix: [docs/acceleration/](docs/acceleration/README.md).
+How each method is hooked into each backbone (one doc per method): [methods/README.md](methods/README.md).
 
 ```bash
 # DreamGen

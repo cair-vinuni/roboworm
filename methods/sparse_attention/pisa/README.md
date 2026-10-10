@@ -1,5 +1,9 @@
 # PISA Adapter for Ctrl-World (SVD UNet)
 
+> How PISA is applied to all three backbones (DreamGen, DreamDojo, Ctrl-World), shipped
+> defaults and limitations: [INTEGRATION.md](INTEGRATION.md). The quick-start below is the
+> original Ctrl-World adapter note; launchers use `block_size 64`, not the 16 shown here.
+
 This folder contains the **Ctrl-World-specific adapter** for PISA
 (Piecewise Sparse Attention). The upstream PISA source lives in
 `../piecewise-sparse-attention/`.

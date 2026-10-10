@@ -11,6 +11,7 @@ and the output root (`sampling_dataset/<method>/...`) change.
 | [sparse_attention.md](sparse_attention.md) | PISA, Radial, SVG1, SVG2 |
 | [pruning.md](pruning.md) | SiTo, ITM (token pruning / merging) |
 | [configs.md](configs.md) | full (cell × method) matrix: launcher, effective config, env, output dir, gaps, known discrepancies |
+| [../../methods/README.md](../../methods/README.md) | per-method integration docs next to the code: hook point per backbone, adaptations vs upstream, defaults, limitations |
 | [../extending/new_acceleration_method.md](../extending/new_acceleration_method.md) | how to add a new method (written separately) |
 
 ## Taxonomy
@@ -40,7 +41,7 @@ They are not among the 9 audited methods and are not covered here.
 | | DreamGen (Cosmos-Predict2 DiT, 2B / 14B) | DreamDojo (action-conditioned DiT, 2B) | Ctrl-World (SVD U-Net) |
 |---|---|---|---|
 | caching | `build_cache_runtime_config()` → `Video2WorldPipeline.from_config(cache_config=…)` → `apply_{worldcache,dicache,fastercache}(pipe.dit)` replaces `dit.forward` (`models/dreamgen/cosmos_predict2/pipelines/video2world.py`); state reset per chunk by `reset_cache_runtime` | infer script builds `{WorldCache,DiCache,FasterCache}Config` → same `apply_*` on the DiT (`models/DreamDojo/cosmos_predict2/_src/predict2/inference/video2world.py`) | `enable_worldcache/enable_dicache` attach a runtime to `unet._ctrl_cache_runtime`; the U-Net forward calls `begin_step / observe_probe / finish_step` (`models/Ctrl-World/models/unet_spatio_temporal_condition.py`). FasterCache installs `SVDFasterCacheAttnProcessor` via `set_attn_processor` |
-| sparse attention | per-block `config.net.{pisa,radial,svg}_parameters` (`models/dreamgen/cosmos_predict2/configs/base/config_{pisa,radial,svg}.py`), dispatched to attention ops in `cosmos_predict2/module/a2a_cp.py` | `model.config.net.self_attention_backend={pisa,radial,svg}` overrides → `build_dreamdojo_*_parameters` in `networks/minimal_v4_dit.py`, ops in `networks/a2a_cp.py` | diffusers attention processors (`methods/sparse_attention/*/processor*.py`) installed by `enable_pisa / enable_radial_attention / enable_svg`; only `attn1` self-attention with T ≥ 128 is sparsified |
+| sparse attention | per-block `config.net.{pisa,radial,svg}_parameters` (`models/dreamgen/cosmos_predict2/configs/base/config_{pisa,radial,svg}.py`), dispatched to attention ops in `cosmos_predict2/module/a2a_cp.py` | `model.config.net.self_attention_backend={pisa,radial,svg}` overrides → `build_dreamdojo_*_parameters` in `networks/minimal_v4_dit.py`, ops in `networks/a2a_cp.py` | diffusers attention processors (`methods/sparse_attention/*/processor*.py`) assigned by `enable_pisa / enable_radial_attention / enable_svg` to every attention module from `unet.named_modules()`; only `attn1` self-attention with T ≥ 128 is sparsified |
 | token reduction | per-block `config.net.{sito,itm}_parameters` → `SiToTokenPruner` / `ITMTokenMerger` in `cosmos_predict2/models/text2image_dit.py`; ITM heat map from `cond − uncond` in the pipeline | `model.config.net.use_{sito,itm}` overrides via `examples/action_conditioned.py` only | `methods/prunning/SiTo/spatiotemporal_hold.py` (ST-hold, shipped), `SiTo/adapter.py` (per-attention), `importance_token_merge/{adapter,block_hold}.py` |
 
 All backends within a family are **mutually exclusive** (enforced in
