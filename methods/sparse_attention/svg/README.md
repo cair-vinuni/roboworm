@@ -1,5 +1,9 @@
 # Sparse-VideoGen (SVG) Adapter for Ctrl-World
 
+> How SVG1/SVG2 are applied to all three backbones (DreamGen, DreamDojo, Ctrl-World), shipped
+> defaults and limitations: [INTEGRATION.md](INTEGRATION.md). This file is the original
+> Ctrl-World adapter note (3-view geometry).
+
 ## Overview
 
 Modular, non-invasive integration of **SVG1** (Stripe Sparse + MSE Profiling) and
