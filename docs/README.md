@@ -4,9 +4,11 @@ Only what is needed to set up, train, run inference, evaluate and reproduce the 
 
 | section | read this for |
 |---|---|
+| [usage.md](usage.md) | how to use the benchmark: score released rollouts, evaluate your own world model, benchmark an acceleration method, run KIVA / RIGIS alone |
 | [setup/](setup/README.md) | the six Python environments (python / torch / CUDA / kernel versions, exact uv commands, verification), frozen package lists ([setup/env_freeze/](setup/env_freeze/)), ffmpeg, secrets; full HF backup / restore incl. checkpoint repos `vgp_checkpoints_*` ([setup/hf_backup_restore.md](setup/hf_backup_restore.md)) |
 | [THIRD_PARTY.md](THIRD_PARTY.md) | every vendored / submodule / pip third-party project: upstream, license, location, our changes, missing LICENSE files, how to fetch the submodules |
 | [datasets/](datasets/README.md) | the 5 source corpora, `datasets/` layout and download, Markovian / non-Markovian labelling, which prepared variant trains which checkpoint |
+| [datasets/download.md](datasets/download.md) | every HF download command, where each one goes (`--local-dir`), the expected tree and a sanity check |
 | [datasets/sampling_dataset.md](datasets/sampling_dataset.md) | benchmark rollouts: download (`--include` recipes), `sampling_dataset/{method}/{embodiment}/{input,output}/{view}/{model}/{split}` layout, input builders per cell |
 | [datasets/cell_matrix.md](datasets/cell_matrix.md), [datasets/benchmark_stats.md](datasets/benchmark_stats.md) | audited episode / rollout counts per cell and method |
 | [training/](training/README.md) | Table C1 training-input mapping (source → prepare → launcher → checkpoint) and the training commands per model family |

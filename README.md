@@ -45,413 +45,173 @@ depth, from Markovian to non-Markovian tasks.*
 
 See the [project page](https://roboworm.github.io/roboworm/#fig6) for the rollout videos behind these examples.
 
+## Contents
+
+- [Proposed metrics: KIVA and RIGIS](#proposed-metrics-kiva-and-rigis)
+- [Quick start](#quick-start)
+- [1. Installation](#1-installation)
+- [2. Data and checkpoints](#2-data-and-checkpoints)
+- [3. Training](#3-training)
+- [4. Rollouts: dense and accelerated](#4-rollouts-dense-and-accelerated)
+- [5. Metrics](#5-metrics)
+- [6. Extending RoboWorM](#6-extending-roboworm)
+- [Repository layout](#repository-layout)
+- [Citation](#citation) · [License](#license) · [Acknowledgements](#acknowledgements)
+
+Full documentation index: [docs/README.md](docs/README.md).
+
 ## Proposed metrics: KIVA and RIGIS
 
-RoboWorM introduces two VLM-free physics metrics. Both check a rollout against what is
-already known about the robot, its kinematic tree and its fixed camera rig, instead of
-asking a VLM judge.
+Two VLM-free physics metrics that check a rollout against what is already known about the
+robot: its kinematic tree and its fixed camera rig.
 
-| metric | what it checks | README | setup guide |
-|---|---|---|---|
-| **KIVA** (Kinematic Invariant Violation Assessment) | Single view: a diffusion keypoint reader recovers 3-D robot keypoints from the pixels and measures link-rigidity error and joint jerk, calibrated against real footage. | [metrics/kiva/README.md](metrics/kiva/README.md) | [docs/metrics/kiva.md](docs/metrics/kiva.md) |
-| **RIGIS** (Robotic Inter-view Geometry & Intrinsic-Extrinsic Stability) | Multi view: VGGT-Ω lifts every view to depth + cameras and scores cross-view geometric consistency (S_geo) and camera-rig stability (S_pose). | [metrics/rigis/README.md](metrics/rigis/README.md) | [docs/metrics/rigis.md](docs/metrics/rigis.md) |
+| metric | what it checks | docs |
+|---|---|---|
+| **KIVA** (Kinematic Invariant Violation Assessment) | Single view: reads 3-D robot keypoints from the pixels, measures link-rigidity error and joint jerk, calibrated against real footage. | [README](metrics/kiva/README.md) · [setup](docs/metrics/kiva.md) · [#14](https://github.com/ltdoanhwork/RoboWorM/pull/14) |
+| **RIGIS** (Robotic Inter-view Geometry & Intrinsic-Extrinsic Stability) | Multi view: VGGT-Ω lifts every view to depth + cameras and scores cross-view geometry (S_geo) and camera-rig stability (S_pose). | [README](metrics/rigis/README.md) · [setup](docs/metrics/rigis.md) · [#13](https://github.com/ltdoanhwork/RoboWorM/pull/13) |
 
-Latest metric updates:
+## Quick start
 
-- **KIVA** ([#14](https://github.com/ltdoanhwork/RoboWorM/pull/14)): two-command
-  CLI (`kinescore calibrate`, `kinescore score`) with fixed per-robot thresholds shipped in
-  [metrics/kiva/thresholds/](metrics/kiva/thresholds/). See
-  [metrics/kiva/README.md](metrics/kiva/README.md).
-- **RIGIS** ([#13](https://github.com/ltdoanhwork/RoboWorM/pull/13)): rewritten
-  README (method, input format, model service + scoring commands) and a refactored
-  geometric-consistency scorer. See [metrics/rigis/README.md](metrics/rigis/README.md).
-
-The other metrics (Visual Integrity, Text Alignment, FVD, PSNR/SSIM/LPIPS) are listed in
-[6. Metrics](#6-metrics).
-
-## How to use the benchmark
-
-There are three ways to use RoboWorM. None of them needs training: the fine-tuned
-checkpoints and every rollout are released.
-
-**A. Score released rollouts.** Download the rollouts and the metric weights, then score any
-cell. This also reproduces the benchmark numbers.
+| goal | what to do | guide |
+|---|---|---|
+| **Score released rollouts** (or reproduce the numbers) | download `sampling_dataset/`, run `python -m metrics.evaluate` | [docs/usage.md](docs/usage.md#a-score-released-rollouts) |
+| **Evaluate your own world model** | roll out from the released inputs, save in the `sampling_dataset/` layout, score | [docs/usage.md](docs/usage.md#b-evaluate-your-own-world-model) |
+| **Benchmark an acceleration method** | copy a dense launcher, add your flags, time + score against dense | [docs/usage.md](docs/usage.md#c-benchmark-an-acceleration-method) |
+| **Use KIVA / RIGIS alone** | `kinescore score ...` / `run_video_metrics ...` on any robot video | [docs/usage.md](docs/usage.md#kiva-and-rigis-on-any-robot-video) |
 
 ```bash
-export HF_HUB_DISABLE_XET=1
-hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
-    --include "dense/single_arm/*" "pisa/single_arm/*"
 PY=models/dreamgen/.venv/bin/python
 CELL=single_arm/output/singleview/dreamgen/makovian
-# reference-free quality of a cell
 $PY -m metrics.evaluate --pred-root sampling_dataset/dense/$CELL \
     --metrics visual_integrity text_alignment --ref-template '' --out results/metrics/dense_sa
-# fidelity of an accelerated cell against dense
 $PY -m metrics.evaluate --pred-root sampling_dataset/pisa/$CELL --ref-root sampling_dataset/dense/$CELL \
     --ref-template '{name}' --metrics fidelity --out results/metrics/pisa_sa
 ```
 
-**B. Evaluate your own world model.**
-1. **Get the episodes:** download `vgp_datasets` into `datasets/`. The conditioning inputs
-   of every episode (GT clips, prompts, actions) are under `sampling_dataset/dense/<embodiment>/input/`.
-2. **Generate:** roll out from the same conditioning prefix to the full GT episode length.
-3. **Save:** write the rollouts into the same layout,
-   `sampling_dataset/dense/<embodiment>/output/<view>/<your_model>/<split>/`. Single-view
-   clips are named `episode_XXXXXX.mp4`, with `episode_XXXXXX_gt.mp4` and a `.txt` prompt
-   next to each. Multi-view rollouts go in one directory per episode.
-4. **Score:** run Visual Integrity, Text Alignment, FVD, plus KIVA for single-view or RIGIS
-   for multi-view, with the commands in [6. Metrics](#6-metrics).
-
-Your rows are then directly comparable with the released ones. The interface, the launcher
-template and the checklist are in [docs/extending/new_world_model.md](docs/extending/new_world_model.md).
-
-**C. Benchmark an acceleration method.**
-1. **Run it:** copy the dense launcher of a cell and add only your method flags
-   ([docs/extending/new_acceleration_method.md](docs/extending/new_acceleration_method.md)).
-2. **Time it:** compare against the dense run on the same GPU
-   ([Speedup measurement](#speedup-measurement)).
-3. **Score it:** fidelity against dense, plus KIVA / RIGIS for physical integrity.
-
-The KIVA and RIGIS metrics also work on their own, on any robot video:
-
-```bash
-# KIVA: one reader + thresholds per robot (metrics/kiva/README.md)
-kinescore score --model ckpt/a1x_ee.a1x_sv.sv1_4x3.pt \
-    --threshold metrics/kiva/thresholds/a1x_ee.a1x_sv.sv1_4x3.json --videos /path/to/clips
-# RIGIS: start the VGGT-Ω service, then score episode dirs with one folder per view (metrics/rigis/README.md)
-cd metrics/rigis && python -m multiview_consistency.run_video_metrics \
-    --episodes_root /path/to/episodes --views "view1,view2" --out_csv rigis.csv --port 6111
-```
-
-## Repository layout
-
-```
-datasets/            source / training data (LeRobot) + prepared DreamGen corpora   -> HF vgp_datasets
-sampling_dataset/    benchmark rollouts {method}/{embodiment}/{input,output}/...    -> HF video_gen_physics
-checkpoints/         base/ (released weights), finetuned/ (ours), metrics/ (I3D, VGGT-Omega, ...)
-models/              dreamgen/ (Cosmos-Predict2), DreamDojo/, Ctrl-World/  (each with its own .venv)
-methods/             cache_strategy/{WorldCache,DiCache,FasterCache}, sparse_attention/{pisa,radial,svg},
-                     prunning/{SiTo,importance_token_merge}
-finetuning/          dreamgen/, dreamdojo/, ctrlworld/ training launchers + data prep
-scripts/             prepare/ infer/ run/{dreamgen,dreamdojo,ctrlworld}/ train/ metrics/ tables/ tools/
-metrics/             evaluate.py (CLI), registry.py, kiva/, rigis/, fvd/, visual_integrity.py,
-                     text_alignment.py, fidelity.py, motion_{smoothness,amplitude}.py
-assets/              scripts/ (figure/table producers) + generated assets
-results/             metric outputs and report tables (not shipped; created on first run)
-docs/                setup, datasets, training, inference, acceleration, metrics, extending, assets/figures
-```
-
-Docs index: [docs/README.md](docs/README.md). Script tree: [scripts/README.md](scripts/README.md).
-
-## 1. Environments
-
-Clone with the submodules (WorldScore for the motion metrics, openpi for π0.5
-policy-in-the-loop, and the SVG kernel sources; see
-[docs/THIRD_PARTY.md](docs/THIRD_PARTY.md#fetching-the-submodules)):
+## 1. Installation
 
 ```bash
 git clone --recursive https://github.com/ltdoanhwork/RoboWorM.git
 # existing clone: git submodule update --init --recursive
 ```
 
-There are six isolated environments, all built with [uv](https://docs.astral.sh/uv/)
-except KIVA's conda env. Never mix them; the launchers activate the right one
-themselves. The versions below were read from the cluster venvs. Exact install commands
-(CUDA wheel indexes, kernels that build with `--no-build-isolation`), notes and a
-verification snippet are in [docs/setup/README.md](docs/setup/README.md). `uv pip
-freeze` snapshots are in [docs/setup/env_freeze/](docs/setup/env_freeze/).
+Each model and metric has its own isolated environment (never mix them; launchers activate
+the right one). Exact install commands, versions and a verification snippet:
+[docs/setup/README.md](docs/setup/README.md).
 
-| env | python | torch / CUDA | key extras | used for | build |
-|---|---|---|---|---|---|
-| `models/dreamgen/.venv` | 3.12 | 2.6.0 / cu124 | flash-attn 2.8.3, flashinfer 0.2.5, transformer-engine 2.14, piq, pyiqa, torchmetrics | DreamGen inference + training, every method except SVG2; `python -m metrics.evaluate` (fidelity, FVD, Visual Integrity, Text Alignment) | `env_freeze/dreamgen.txt` |
-| `models/dreamgen/.venv_svg` | 3.12 | 2.6.0 / cu124 | as above, but **flashinfer 0.3.1** | DreamGen **SVG2** only | `env_freeze/dreamgen__svg.txt` |
-| `models/DreamDojo/.venv` | 3.10 | 2.7.0 / cu128 | flash-attn 2.7.3, natten 0.21, transformer-engine 2.2, flashinfer 0.3.1 | DreamDojo inference + training, all methods | `uv sync --extra=cu128` in `models/DreamDojo` |
-| `models/Ctrl-World/.venv` | 3.10 | 2.7.1 / cu126 | diffusers 0.34, flashinfer 0.3.1 | Ctrl-World inference + training, all methods | `models/Ctrl-World/requirements.txt` + `env_freeze/Ctrl-World.txt` |
-| `metrics/rigis/.venv` | 3.13 | 2.14.1 / cu126 | VGGT-Omega, numba (added by `run.sh`) | RIGIS | `cd metrics/rigis && uv sync` |
-| `hdmi` conda env (`HAL_PYTHON`) | 3.10 | 2.7.0 / cu128 | transformers 5.2 (DINOv3), pytorch-kinematics | KIVA | `pip install -e "metrics/kiva[dino,video,bench]"` |
+| env | used for |
+|---|---|
+| `models/dreamgen/.venv` (py3.12, torch 2.6 cu124) | DreamGen, every method except SVG2, `metrics.evaluate` |
+| `models/dreamgen/.venv_svg` (flashinfer 0.3.1) | DreamGen SVG2 |
+| `models/DreamDojo/.venv` (py3.10, torch 2.7 cu128) | DreamDojo, all methods |
+| `models/Ctrl-World/.venv` (py3.10, torch 2.7.1 cu126) | Ctrl-World, all methods |
+| `metrics/rigis/.venv` (py3.13) | RIGIS |
+| KIVA env (py3.10, `pip install -e "metrics/kiva[dino,video,bench]"`) | KIVA |
 
-```bash
-# example: the main DreamGen env (the other five are in docs/setup/README.md)
-uv venv --python 3.12 models/dreamgen/.venv && PY=models/dreamgen/.venv
-uv pip install --python $PY torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cu124
-uv pip install --python $PY --no-build-isolation flash-attn==2.8.3 "transformer-engine[pytorch]==2.14.1"
-uv pip install --python $PY --index-strategy unsafe-best-match --extra-index-url https://download.pytorch.org/whl/cu124 \
-    --extra-index-url https://flashinfer.ai/whl/cu124/torch2.6/ --extra-index-url https://pypi.nvidia.com \
-    -r docs/setup/env_freeze/dreamgen.txt
-$PY/bin/python -c "import torch, flash_attn, flashinfer; print(torch.__version__, torch.cuda.is_available(), flashinfer.__version__)"
-```
+Also required: `ffmpeg` / `ffprobe` on `PATH`, and `export HF_HUB_DISABLE_XET=1` for
+Hugging Face downloads on parallel filesystems.
 
-You also need **ffmpeg / ffprobe** on `PATH` (prepare scripts, GT rendering, RIGIS
-frame extraction, KIVA probing), and `export HF_HUB_DISABLE_XET=1` for every Hugging
-Face download on a parallel filesystem.
-
-## 2. Data
+## 2. Data and checkpoints
 
 [![Benchmark composition](docs/assets/figures/dataset_composition.png)](https://roboworm.github.io/roboworm/#benchmark)
 
-*Benchmark composition: 1,605 episodes split between Markovian and non-Markovian tasks,
-29,343 rollouts across dense and the three acceleration families, 5 robot platforms over
-3 embodiments, a range of manipulation skills, and the three world models with their
-conditioning (DreamGen: instruction + first frame; DreamDojo: autoregressive action
-chunks; Ctrl-World: multi-view, policy-in-the-loop with memory).*
-
-```bash
-pip install -U "huggingface_hub[cli]"
-export HF_HUB_DISABLE_XET=1     # required on this cluster's parallel filesystem
-```
-
-**Source / training data**: <https://huggingface.co/datasets/doanh25032004/vgp_datasets>
-(36.4 GB, LeRobot format), downloaded to `datasets/`:
-
-```bash
-# LeRobot sources + the DreamGen training corpora
-hf download doanh25032004/vgp_datasets --repo-type dataset --local-dir datasets \
-    --include "single_arm/*" "bimanual/*" "humanoid/*" \
-              "single_arm_static_dreamgen_16fps/*" "bimanual_dreamgen_16fps/*" "humanoid_dreamgen_16fps/*" \
-              "bimanual_multiview_grid_seg16_dreamgen/*" "humanoid_multiview_grid_seg16_dreamgen/*"
-# one embodiment/view only
-hf download doanh25032004/vgp_datasets --repo-type dataset --local-dir datasets --include "humanoid/singleview/*"
-```
-
-**Benchmark rollouts**: <https://huggingface.co/datasets/doanh25032004/video_gen_physics>
-(178 GB, about 136k files), downloaded to `sampling_dataset/`. Paths follow the pattern
-`sampling_dataset/{method}/{embodiment}/{input,output}/{view}/{model}/{split}/...`, and
-`input/` exists only under `dense/`.
-
-```bash
-hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset            # all
-hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
-    --include "dense/*" "pisa/*"                                                                        # two methods
-hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
-    --include "*/bimanual/input/multiview/dreamgen/*" "*/bimanual/output/multiview/dreamgen/*"          # one cell
-hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
-    --include "data_for_web/*.json" "data_for_web/*.csv"                                                # human labels
-```
-
-Details:
-- [docs/datasets/README.md](docs/datasets/README.md): corpora, layout, Markovian
-  labelling, and which variants are used.
-- [docs/datasets/sampling_dataset.md](docs/datasets/sampling_dataset.md): layout,
-  output conventions per model, and input builders per cell.
-
-### Where to put the downloads
-
-Every launcher, prepare script and metric runner resolves paths relative to the repo
-root, so run all downloads from the repo root with exactly these `--local-dir` targets.
-The three trees are gitignored; only `checkpoints/CHECKPOINTS.md` is tracked.
-
-| download | HF repo (type) | `--local-dir` | read by |
-|---|---|---|---|
-| source / training data | `doanh25032004/vgp_datasets` (dataset) | `datasets` | `scripts/run/*` (`--dataset-base datasets/<emb>/<view>`), `scripts/prepare/`, `finetuning/` |
-| benchmark rollouts | `doanh25032004/video_gen_physics` (dataset) | `sampling_dataset` | `metrics.evaluate`, `scripts/metrics/`, `assets/scripts/`; launchers write new rollouts here |
-| base weights | `doanh25032004/vgp_checkpoints_{nvidia,dreamdojo,google_t5}` (model) | `checkpoints/base/{nvidia,dreamdojo,google-t5}` | all model launchers |
-| other base + metric weights | `doanh25032004/vgp_checkpoints_own` (model) | `checkpoints`, then re-layout | Ctrl-World, FVD I3D, WorldScore probes (KIVA / RIGIS weights: see CHECKPOINTS.md, Metrics) |
-| our fine-tuned weights | `doanh25032004/vgp_exp_logs` (model) | `exp_logs`, then re-layout | every fine-tuned cell (`checkpoints/finetuned/...`) |
-
-The re-layout snippet for the last two rows is in
-[checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md#restore-from-huggingface). After it,
-the repo root looks like this:
-
-```
-datasets/
-  single_arm/{singleview,multiview}/{makovian,non_makovian}/        LeRobot: meta/ data/ videos/
-  bimanual/{singleview,multiview}/{makovian,non_makovian}/<task>/    one dir per task
-  humanoid/singleview/{makovian,non_makovian}/                       + captions/
-  humanoid/multiview/{makovian,non_makovian}/<task>/                 RoboCOIN tasks
-  single_arm_static_dreamgen_16fps/  bimanual_dreamgen_16fps/  humanoid_dreamgen_16fps/
-  bimanual_multiview_grid_seg16_dreamgen/  humanoid_multiview_grid_seg16_dreamgen/
-                                                                     DreamGen training corpora: videos/ metas/ t5_xxl/
-sampling_dataset/
-  {method}/{embodiment}/{input,output}/{view}/{model}/{split}/...    input/ only under dense/
-  data_for_web/                                                      human labels + catalog
-checkpoints/
-  base/{nvidia,dreamdojo,google-t5,ctrl_world,stabilityai,openai,pi05_droid,meta-llama,droid,mjcf,...}
-  finetuned/{ctrlworld,dreamdojo,dreamgen}/
-  metrics/{fvd,worldscore,vggt_omega,kiva}/
-```
-
-`hf download` is the current name of `huggingface-cli download`; both take the same
-arguments. Keep `export HF_HUB_DISABLE_XET=1` set for every download (the Xet backend
-fails on parallel filesystems). Quick sanity check after downloading:
-
-```bash
-ls datasets/humanoid/singleview/makovian/meta            # info.json episodes.jsonl tasks.jsonl ...
-ls datasets/bimanual/multiview/makovian | head -3          # close_cardboard_box close_toolbox ...
-ls sampling_dataset/dense/humanoid/output/singleview/dreamgen   # makovian non_makovian
-ls checkpoints/base checkpoints/finetuned checkpoints/metrics
-```
-
-Metric outputs and report tables are written to `results/` (gitignored, created on first run).
-
-## 3. Checkpoints
-
-[checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md) lists the checkpoint of every
-dense cell (path, size, step) together with the base and metric weights. To restore from
-the HF model repos `doanh25032004/vgp_checkpoints_{nvidia,dreamdojo,google_t5,own}`:
+| download | HF repo | put it in |
+|---|---|---|
+| source / training data (LeRobot) | [`vgp_datasets`](https://huggingface.co/datasets/doanh25032004/vgp_datasets) | `datasets/` |
+| benchmark rollouts (dense + 9 methods) | [`video_gen_physics`](https://huggingface.co/datasets/doanh25032004/video_gen_physics) | `sampling_dataset/` |
+| base, metric and fine-tuned weights | `vgp_checkpoints_*`, `vgp_exp_logs` | `checkpoints/` |
 
 ```bash
 export HF_HUB_DISABLE_XET=1
-hf download doanh25032004/vgp_checkpoints_nvidia    --repo-type model --local-dir checkpoints/base/nvidia
-hf download doanh25032004/vgp_checkpoints_dreamdojo --repo-type model --local-dir checkpoints/base/dreamdojo
-hf download doanh25032004/vgp_checkpoints_google_t5 --repo-type model --local-dir checkpoints/base/google-t5
-hf download doanh25032004/vgp_checkpoints_own       --repo-type model --local-dir checkpoints   # then re-layout, see CHECKPOINTS.md
+hf download doanh25032004/vgp_datasets      --repo-type dataset --local-dir datasets --include "humanoid/singleview/*"
+hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset --include "dense/*"
 ```
 
-The full backup / restore recipe and its gotchas are in
-[docs/setup/hf_backup_restore.md](docs/setup/hf_backup_restore.md).
+- All download commands, the expected tree and a sanity check: [docs/datasets/download.md](docs/datasets/download.md)
+- Corpora, splits and layout: [docs/datasets/README.md](docs/datasets/README.md), [docs/datasets/sampling_dataset.md](docs/datasets/sampling_dataset.md)
+- Checkpoint of every cell and how to restore it: [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md)
 
-## 4. Training (optional: fine-tuned checkpoints are released)
+## 3. Training
 
-Three cells use released weights:
-- Ctrl-World single-arm
-- DreamGen 14B single-arm MV
-- DreamDojo GR1
-
-The other 9 checkpoints were post-trained. Each one was trained on exactly one prepared
-input, built by the prepare script below from the LeRobot sources in `datasets/`:
-
-| checkpoint (`checkpoints/finetuned/...`) | prepare script | training input |
-|---|---|---|
-| `ctrlworld/bimanual_multiview_4view_grid/checkpoint-110000.pt` | `scripts/prepare/prepare_ctrlworld_bimanual_multiview_grid.py` + meta builder | `models/Ctrl-World/dataset_example/bimanual_multiview_4view_grid/` |
-| `ctrlworld/humanoid_multiview_4view_grid/checkpoint-140000.pt` | `scripts/prepare/prepare_ctrlworld_humanoid_multiview_grid.py` + meta builder | `models/Ctrl-World/dataset_example/humanoid_multiview_4view_grid/` |
-| `dreamgen/.../multiview/bimanual_multiview_seg16/.../iter_000120000.pt` | `finetuning/dreamgen/scripts/prepare_bimanual_multiview_grid_dreamgen.py` → `segment_bimanual_multiview_grid_dreamgen.py` → T5 → `reencode_bimanual_multiview_seg_16fps.py` | `datasets/bimanual_multiview_grid_seg16_dreamgen/` |
-| `dreamgen/.../multiview/humanoid_multiview_seg16/.../iter_000100000.pt` | `finetuning/dreamgen/scripts/prepare_humanoid_multiview_grid_dreamgen.py` → `segment_humanoid_multiview_grid_dreamgen.py` → T5 → `reencode_humanoid_multiview_seg_16fps.py` | `datasets/humanoid_multiview_grid_seg16_dreamgen/` |
-| `dreamgen/.../singleview/single_arm_static_singleview_16fps_v2/.../iter_000090000.pt` | `finetuning/dreamgen/scripts/prepare_single_arm_robochallenge_dreamgen_16fps.py` + T5 | `datasets/single_arm_static_dreamgen_16fps/` |
-| `dreamgen/.../singleview/bimanual_singleview_16fps/.../iter_000110000.pt` | `finetuning/dreamgen/scripts/prepare_bimanual_dreamgen_16fps.py` + T5 | `datasets/bimanual_dreamgen_16fps/` |
-| `dreamgen/.../singleview/humanoid_singleview_16fps/.../iter_000090000.pt` | `scripts/tools/data/run_caption_humanoid_singleview.sh` → `finetuning/dreamgen/scripts/prepare_humanoid_dreamgen_16fps.py` + T5 | `datasets/humanoid_dreamgen_16fps/` |
-| `dreamdojo/.../exp_single_arm_sv/single_arm_singleview/checkpoints/iter_000030000` | none (`MultiVideoActionDataset` reads LeRobot directly) | `datasets/single_arm/singleview/` |
-| `dreamdojo/.../exp_aloha_resume70k/aloha_bimanual_singleview_full/checkpoints/iter_000100000` | none (`MultiVideoActionDataset`) | `datasets/bimanual/singleview/` |
-
-The full table (launchers, configs, warm starts, the 3 released checkpoints) is in
-[docs/training/README.md](docs/training/README.md). Representative commands:
+Optional: all fine-tuned checkpoints are released. Three cells use released base weights;
+the other 9 were post-trained, each on one prepared input built from `datasets/`.
+Checkpoint → prepare script → training input → launcher: [docs/training/README.md](docs/training/README.md).
 
 ```bash
-# DreamGen 2B (models/dreamgen/.venv): prepare -> T5 -> launch, one script per checkpoint
-NPROC=4 bash finetuning/dreamgen/train_bimanual_16fps.sh                     # bimanual SV
-SKIP_REENCODE=1 NPROC=4 bash finetuning/dreamgen/train_bimanual_multiview_grid_16fps.sh   # bimanual MV 2x2
-# DreamDojo 2B (models/DreamDojo/.venv)
-NPROC=2 bash finetuning/dreamdojo/launch.sh dreamdojo_2b_480_640_single_arm_sv
-# Ctrl-World (models/Ctrl-World/.venv): encode latents -> meta -> accelerate train
-NPROC=4 bash scripts/train/run_humanoid_multiview_ctrlworld_train_4view_grid.sh
+NPROC=4 bash finetuning/dreamgen/train_bimanual_16fps.sh                      # DreamGen 2B
+NPROC=2 bash finetuning/dreamdojo/launch.sh dreamdojo_2b_480_640_single_arm_sv  # DreamDojo 2B
+NPROC=4 bash scripts/train/run_humanoid_multiview_ctrlworld_train_4view_grid.sh # Ctrl-World
 ```
 
-## 5. Dense and accelerated rollouts
+## 4. Rollouts: dense and accelerated
 
-Launchers live in `scripts/run/{dreamgen,dreamdojo,ctrlworld}/`. They are resumable,
-discover episodes automatically, and write to `sampling_dataset/<method>/...`. Each
-accelerated launcher is identical to the dense launcher of its cell except for the
-method flags. The full table of 12 dense launchers and the method knobs is in
-[docs/inference/README.md](docs/inference/README.md).
-Per-method details and the full (cell × method) config matrix: [docs/acceleration/](docs/acceleration/README.md).
-How each method is hooked into each backbone (one doc per method): [methods/README.md](methods/README.md).
+Launchers live in `scripts/run/{dreamgen,dreamdojo,ctrlworld}/`, named
+`run_<embodiment>_<view>_<model>[_4view_grid]_<method>.sh`. They are resumable, discover
+episodes automatically and write to `sampling_dataset/<method>/...`. Each accelerated
+launcher equals the dense launcher of its cell plus the method flags.
 
 ```bash
-# DreamGen
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_full.sh           # dense
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_dicache.sh        # DiCache
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_pisa.sh           # PISA
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_svg2.sh           # SVG2 (.venv_svg)
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamgen/run_single_arm_singleview_dreamgen_sito.sh        # SiTo
-
-# DreamDojo
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamdojo/run_humanoid_singleview_dreamdojo_full_episode.sh   # dense
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/dreamdojo/run_humanoid_singleview_dreamdojo_all_methods.sh    # all 9 methods
-
-# Ctrl-World
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/ctrlworld/run_bimanual_multiview_ctrlworld_4view_grid.sh             # dense
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/ctrlworld/run_bimanual_multiview_ctrlworld_4view_grid_worldcache.sh  # WorldCache
-CUDA_VISIBLE_DEVICES=0 bash scripts/run/ctrlworld/run_single_arm_multiview_ctrlworld_itm.sh                  # ITM
+bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_full.sh              # DreamGen dense
+bash scripts/run/dreamgen/run_humanoid_multiview_dreamgen_dicache.sh           # DreamGen + DiCache
+bash scripts/run/dreamdojo/run_humanoid_singleview_dreamdojo_all_methods.sh    # DreamDojo, all 9 methods
+bash scripts/run/ctrlworld/run_bimanual_multiview_ctrlworld_4view_grid.sh      # Ctrl-World dense
 ```
 
-Launcher names follow the pattern
-`scripts/run/<family>/run_<embodiment>_<view>_<model>[_4view_grid]_<method>.sh`.
-For trial runs, send output to a scratch tree with `SAVE_ROOT` / `OUTPUT_ROOT`.
+- 12 dense launchers and knobs: [docs/inference/README.md](docs/inference/README.md)
+- 9 methods, (cell × method) configs, speedup protocol: [docs/acceleration/README.md](docs/acceleration/README.md)
+- How each method hooks into each backbone: [methods/README.md](methods/README.md)
 
 [![Dense world-model results](docs/assets/figures/dense_results.png)](https://roboworm.github.io/roboworm/#models)
 
-*Dense (non-accelerated) results for every cell, split into Markovian and non-Markovian
-tasks: visual integrity, PSNR, text alignment, FVD and the physical audit (RIGIS for
-multi-view tracks, KIVA for single-view tracks). Ctrl-World leads on multi-view, DreamDojo
-on most single-view settings. Interactive tables:
-[project page](https://roboworm.github.io/roboworm/#models).*
-
-### Speedup measurement
-
-Speedup is the dense time divided by the method time, measured with each model's
-internal per-segment timer on the same episodes and GPU:
-- DreamGen: `Total inference time`
-- DreamDojo: `[Timing] Generated`
-- Ctrl-World: `wall_time_s`
-
-```bash
-bash scripts/tools/tune/_bench_uniform_timing.sh --estimate
-bash scripts/tools/tune/_bench_uniform_timing.sh --all --gpu 0          # or --cell dreamdojo_humanoid_sv
-models/dreamgen/.venv/bin/python assets/scripts/merge_timing_shards.py    # -> results/reports/speedup_perchunk.csv
-models/dreamgen/.venv/bin/python assets/scripts/make_timing_pass_table.py # -> results/reports/timing_pass.{json,csv}
-models/dreamgen/.venv/bin/python scripts/tables/make_speedup_summary.py --sampling-root sampling_dataset --out-dir results/reports
-```
-
 [![Speedup vs physical audit](docs/assets/figures/speedup_tradeoff.png)](https://roboworm.github.io/roboworm/#acceleration)
 
-*Speed–quality trade-off of every method on the bimanual cells. Bars show the speedup over
-the paired dense rollout, the right axis shows the physical audit (RIGIS for multi-view,
-KIVA for single-view), and boxed values show aggregate quality retention. Caching gives
-the largest speedups with near-zero degradation; token pruning degrades the most.*
+*Top: dense results for every cell (Markovian / non-Markovian). Bottom: speedup over dense vs
+physical audit for every method on the bimanual cells. Interactive versions on the
+[project page](https://roboworm.github.io/roboworm/#acceleration).*
 
-Per-embodiment trade-off plots (humanoid, single-arm) are on the [project page](https://roboworm.github.io/roboworm/#acceleration).
+## 5. Metrics
 
-## 6. Metrics
+One CLI for all metrics: `python -m metrics.evaluate --metrics <name> ...`.
 
-The CLI is `python -m metrics.evaluate`. The registry and options are documented in
-[metrics/README.md](metrics/README.md), and the evaluation protocol in
-[docs/metrics/README.md](docs/metrics/README.md).
+| metric | registry name | reference |
+|---|---|---|
+| KIVA, RIGIS (ours) | `kiva`, `rigis` | none (physics audit) |
+| Visual Integrity (CLIP-IQA+) | `visual_integrity` | none |
+| Text Alignment (CLIPScore) | `text_alignment` | prompt |
+| FVD (I3D) | `fvd` | shared real pool |
+| PSNR / SSIM / LPIPS | `fidelity` | dense rollout of the same episode (never GT) |
 
-```bash
-PY=models/dreamgen/.venv/bin/python; export HF_HUB_OFFLINE=1
-CELL=sampling_dataset/dense/single_arm/output/singleview/dreamgen/makovian
-$PY -m metrics.evaluate --pred-root $CELL --metrics visual_integrity text_alignment --ref-template '' --out results/metrics/sa_sv_mk
-$PY -m metrics.evaluate --pred-root $CELL --metrics fvd                 --out results/metrics/sa_sv_mk_fvd
-$PY -m metrics.evaluate --pred-root $CELL --metrics kiva --opt kiva.embodiment=single_arm \
-    --opt kiva.score_ref=true --out results/metrics/sa_sv_mk_kiva
+- Registry, options and citations: [metrics/README.md](metrics/README.md)
+- Protocol and full-benchmark sweep commands: [docs/metrics/README.md](docs/metrics/README.md)
 
-# full-benchmark sweeps
-ROLE=gt bash metrics/kiva/run.sh --tmux && bash metrics/kiva/run.sh --tmux          # KIVA   -> results/hallucination/
-bash metrics/rigis/run.sh --tmux                                                    # RIGIS  -> results/multiview_consistency/
-bash scripts/metrics/run_dense_nr.sh                                                # Visual Integrity + Text Alignment
-MACHINES=1 bash scripts/metrics/run_dr_metrics.sh 0                                 # PSNR/SSIM/LPIPS/FVD vs dense
-```
+## 6. Extending RoboWorM
 
-Two protocol rules matter when comparing numbers:
-- Fidelity is always measured against the **dense prediction** of the same episode,
-  never against GT.
-- Multiview FVD uses a **shared per-camera real pool**.
-
-## 7. Extending RoboWorM
-
-The benchmark can be extended along three axes: a new world model, a new embodiment /
-dataset, or a new fast-inference method. A new entrant is directly comparable to every
-existing number, because metrics are stored per clip and paired only when results are
-aggregated, so nothing already in the benchmark is re-scored.
-Guides, grounded in the code: [docs/extending/](docs/extending/README.md).
+Add a world model (new row), an embodiment / dataset (new column), an acceleration method or
+a metric. Metrics are stored per clip, so a new entrant is comparable with every existing
+number without re-scoring.
 
 [![Extending RoboWorM](docs/assets/figures/extending.png)](docs/extending/README.md)
 
-*The three extension paths. (A) A new world model: fine-tune on the released corpus, run
-the benchmark grid, score with the existing metrics (a new row). (B) A new embodiment
-dataset: register it, prepare prompts/actions/video, fine-tune the backbones, and add a
-KIVA keypoint reader and a RIGIS camera setup (a new column). (C) A new acceleration
-method: plug it into the existing models, run the grid, and measure its speed–quality
-trade-off against dense.*
+| add | guide |
+|---|---|
+| a world model | [new_world_model.md](docs/extending/new_world_model.md) |
+| an embodiment / dataset | [new_embodiment_dataset.md](docs/extending/new_embodiment_dataset.md) |
+| an acceleration method | [new_acceleration_method.md](docs/extending/new_acceleration_method.md) |
+| a metric | [new_metric.md](docs/extending/new_metric.md) |
 
-| add | what it takes | guide |
-|---|---|---|
-| a world model (a new row) | fine-tune on the released corpus; `prepare` → `infer` → `run` scripts writing `sampling_dataset/dense/...`; score with the existing metrics | [new_world_model.md](docs/extending/new_world_model.md) |
-| an embodiment / dataset (a new column) | LeRobot corpus, regime + taxonomy labels, camera mounts; fine-tune each backbone; a KIVA keypoint reader with real-segment thresholds, a RIGIS view pair, an FVD real pool | [new_embodiment_dataset.md](docs/extending/new_embodiment_dataset.md) |
-| an acceleration method | `add_<method>_args` + enable hook in `methods/<family>/`; one launcher per cell mirroring dense; per-cell knee; matched dense timing | [new_acceleration_method.md](docs/extending/new_acceleration_method.md) |
-| a metric | a `BaseMetric` subclass registered in `metrics/registry.py`, run by `python -m metrics.evaluate` | [new_metric.md](docs/extending/new_metric.md) |
+## Repository layout
 
-Setup of the two physical audits: [docs/metrics/kiva.md](docs/metrics/kiva.md),
-[docs/metrics/rigis.md](docs/metrics/rigis.md).
+```
+datasets/          source / training data (LeRobot) + DreamGen corpora      -> HF vgp_datasets
+sampling_dataset/  rollouts {method}/{embodiment}/{input,output}/...         -> HF video_gen_physics
+checkpoints/       base/, finetuned/, metrics/
+models/            dreamgen/ (Cosmos-Predict2), DreamDojo/, Ctrl-World/   (own .venv each)
+methods/           cache_strategy/, sparse_attention/, prunning/
+finetuning/        training launchers + data prep per model
+scripts/           prepare/ infer/ run/ train/ metrics/ tables/ tools/       (scripts/README.md)
+metrics/           evaluate.py, registry.py, kiva/, rigis/, fvd/, ...
+docs/              setup, datasets, training, inference, acceleration, metrics, extending
+```
 
 ## Citation
 
