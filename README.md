@@ -26,41 +26,14 @@ tables and rollout videos are on the **[project page](https://roboworm.github.io
 two task horizons; (b) the physics audit with KIVA and RIGIS; (c) inference acceleration
 across 3 world models and 9 methods, about 29k rollouts.*
 
-RoboWorM tests action-/text-conditioned video world models on real robot episodes. It
-also tests whether training-free acceleration keeps the physics of the rollout intact.
-
-- **Data**: 1,605 real episodes from **5 source corpora**: DROID, RoboChallenge,
-  AIST Bimanual, RoboCOIN and GR00T Teleop GR1. They cover **3 embodiments**
-  (single-arm, bimanual, humanoid), **1–4 synchronized views** and two task regimes,
-  **Markovian** and **non-Markovian**. On disk these are named `makovian` / `non_makovian`.
-- **World models (3)**: **DreamGen** (Cosmos-Predict2 2B / 14B DiT), **DreamDojo**
-  (2B action-conditioned DiT) and **Ctrl-World** (Stable Video Diffusion 1.5B U-Net).
-  Together they make 12 dense cells (listed in
-  [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md)). Ctrl-World uses 3 views on
-  single-arm and a 4-view 2×2 grid on bimanual and humanoid.
-- **Acceleration (9 + dense)**:
-  - feature caching: FasterCache, DiCache, WorldCache
-  - sparse attention: SVG1, SVG2, Radial, PISA
-  - token reduction: SiTo, ITM
-- **Metrics**:
-  - **KIVA**: intra-view kinematic stability (embodiment hallucination), reported as
-    excess over the real-video anchor.
-  - **RIGIS**: inter-view geometry and intrinsic/extrinsic stability (VGGT-Omega).
-  - **Visual Integrity**: CLIP-IQA+, p10 over frames.
-  - **Text Alignment**: CLIPScore.
-  - **FVD**: I3D, 16-frame windows at 5 fps, shared real pool.
-  - **PSNR / SSIM / LPIPS** against the paired dense rollout.
-- **Speedup**: the model's internal per-segment timer, divided by the timer of the
-  paired dense run (same episodes, same GPU).
-
-Rollout totals: 3,166 dense rollouts, and 29,343 including the accelerators
-([docs/datasets/cell_matrix.md](docs/datasets/cell_matrix.md)).
-
-[![Comparison with other benchmarks](docs/assets/figures/benchmark_comparison.png)](https://roboworm.github.io/roboworm/#related)
-
-*How RoboWorM compares with existing video world model benchmarks on data diversity
-(samples, sources, morphologies, multi-view, long-horizon tasks) and evaluation dimensions
-(evaluator paradigm, cross-view geometry, speedup audit).*
+- **Data**: 1,605 real episodes, 5 corpora, 3 embodiments (single-arm, bimanual,
+  humanoid), 1–4 synced views, Markovian and non-Markovian tasks.
+- **World models**: DreamGen, DreamDojo and Ctrl-World, 12 dense cells
+  ([checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md)).
+- **Acceleration**: 9 training-free methods (caching, sparse attention, token reduction),
+  about 29k rollouts in total.
+- **Metrics**: KIVA and RIGIS (ours), plus Visual Integrity, Text Alignment, FVD and
+  PSNR / SSIM / LPIPS against the dense rollout.
 
 [![Qualitative audit](docs/assets/figures/qualitative_audit.png)](https://roboworm.github.io/roboworm/#fig6)
 
@@ -96,6 +69,60 @@ Latest metric updates:
 The other metrics (Visual Integrity, Text Alignment, FVD, PSNR/SSIM/LPIPS) are listed in
 [6. Metrics](#6-metrics).
 
+## How to use the benchmark
+
+There are three ways to use RoboWorM. None of them needs training: the fine-tuned
+checkpoints and every rollout are released.
+
+**A. Score released rollouts.** Download the rollouts and the metric weights, then score any
+cell. This also reproduces the benchmark numbers.
+
+```bash
+export HF_HUB_DISABLE_XET=1
+hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset \
+    --include "dense/single_arm/*" "pisa/single_arm/*"
+PY=models/dreamgen/.venv/bin/python
+CELL=single_arm/output/singleview/dreamgen/makovian
+# reference-free quality of a cell
+$PY -m metrics.evaluate --pred-root sampling_dataset/dense/$CELL \
+    --metrics visual_integrity text_alignment --ref-template '' --out results/metrics/dense_sa
+# fidelity of an accelerated cell against dense
+$PY -m metrics.evaluate --pred-root sampling_dataset/pisa/$CELL --ref-root sampling_dataset/dense/$CELL \
+    --ref-template '{name}' --metrics fidelity --out results/metrics/pisa_sa
+```
+
+**B. Evaluate your own world model.**
+1. **Get the episodes:** download `vgp_datasets` into `datasets/`. The conditioning inputs
+   of every episode (GT clips, prompts, actions) are under `sampling_dataset/dense/<embodiment>/input/`.
+2. **Generate:** roll out from the same conditioning prefix to the full GT episode length.
+3. **Save:** write the rollouts into the same layout,
+   `sampling_dataset/dense/<embodiment>/output/<view>/<your_model>/<split>/`. Single-view
+   clips are named `episode_XXXXXX.mp4`, with `episode_XXXXXX_gt.mp4` and a `.txt` prompt
+   next to each. Multi-view rollouts go in one directory per episode.
+4. **Score:** run Visual Integrity, Text Alignment, FVD, plus KIVA for single-view or RIGIS
+   for multi-view, with the commands in [6. Metrics](#6-metrics).
+
+Your rows are then directly comparable with the released ones. The interface, the launcher
+template and the checklist are in [docs/extending/new_world_model.md](docs/extending/new_world_model.md).
+
+**C. Benchmark an acceleration method.**
+1. **Run it:** copy the dense launcher of a cell and add only your method flags
+   ([docs/extending/new_acceleration_method.md](docs/extending/new_acceleration_method.md)).
+2. **Time it:** compare against the dense run on the same GPU
+   ([Speedup measurement](#speedup-measurement)).
+3. **Score it:** fidelity against dense, plus KIVA / RIGIS for physical integrity.
+
+The KIVA and RIGIS metrics also work on their own, on any robot video:
+
+```bash
+# KIVA: one reader + thresholds per robot (metrics/kiva/README.md)
+kinescore score --model ckpt/a1x_ee.a1x_sv.sv1_4x3.pt \
+    --threshold metrics/kiva/thresholds/a1x_ee.a1x_sv.sv1_4x3.json --videos /path/to/clips
+# RIGIS: start the VGGT-Ω service, then score episode dirs with one folder per view (metrics/rigis/README.md)
+cd metrics/rigis && python -m multiview_consistency.run_video_metrics \
+    --episodes_root /path/to/episodes --views "view1,view2" --out_csv rigis.csv --port 6111
+```
+
 ## Repository layout
 
 ```
@@ -107,7 +134,8 @@ methods/             cache_strategy/{WorldCache,DiCache,FasterCache}, sparse_att
                      prunning/{SiTo,importance_token_merge}
 finetuning/          dreamgen/, dreamdojo/, ctrlworld/ training launchers + data prep
 scripts/             prepare/ infer/ run/{dreamgen,dreamdojo,ctrlworld}/ train/ metrics/ tables/ tools/
-metrics/             evaluate.py (CLI), kiva/, rigis/, fvd.py, clip_score.py, fidelity.py, quality/
+metrics/             evaluate.py (CLI), registry.py, kiva/, rigis/, fvd/, visual_integrity.py,
+                     text_alignment.py, fidelity.py, motion_{smoothness,amplitude}.py
 assets/              scripts/ (figure/table producers) + generated assets
 results/             metric outputs and report tables (not shipped; created on first run)
 docs/                setup, datasets, training, inference, acceleration, metrics, extending, assets/figures
@@ -378,24 +406,10 @@ The CLI is `python -m metrics.evaluate`. The registry and options are documented
 [metrics/README.md](metrics/README.md), and the evaluation protocol in
 [docs/metrics/README.md](docs/metrics/README.md).
 
-[![KIVA and RIGIS](docs/assets/figures/kiva_rigis.png)](https://roboworm.github.io/roboworm/#method)
-
-*The two physical audits. (a) KIVA: a shared video-conditioned reader trained on
-forward-kinematics targets; five denoised candidates are averaged before rigidity and jerk
-are measured and calibrated against real-video references. (b) RIGIS: VGGT-Ω estimates
-depth and cameras to score geometric consistency and camera-pose stability across views.*
-
-[![KIVA / RIGIS vs VLM judges](docs/assets/figures/metrics_vs_judges.png)](https://roboworm.github.io/roboworm/#results)
-
-*KIVA (top) and RIGIS (bottom) against four VLM judges, zero-shot and with
-chain-of-thought: correlation and accuracy with human scores, and latency per video second.*
-
-Interactive KIVA / RIGIS demos and the human-alignment analysis: [project page](https://roboworm.github.io/roboworm/#kiva).
-
 ```bash
 PY=models/dreamgen/.venv/bin/python; export HF_HUB_OFFLINE=1
 CELL=sampling_dataset/dense/single_arm/output/singleview/dreamgen/makovian
-$PY -m metrics.evaluate --pred-root $CELL --metrics fidelity clip_score --out results/metrics/sa_sv_mk
+$PY -m metrics.evaluate --pred-root $CELL --metrics visual_integrity text_alignment --ref-template '' --out results/metrics/sa_sv_mk
 $PY -m metrics.evaluate --pred-root $CELL --metrics fvd                 --out results/metrics/sa_sv_mk_fvd
 $PY -m metrics.evaluate --pred-root $CELL --metrics kiva --opt kiva.embodiment=single_arm \
     --opt kiva.score_ref=true --out results/metrics/sa_sv_mk_kiva
