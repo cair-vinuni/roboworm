@@ -90,7 +90,7 @@ All five nested checkouts are git submodules ([`.gitmodules`](../.gitmodules)). 
 recorded commit was checked to be fetchable from its upstream URL (2026-10-09):
 
 ```bash
-git clone --recursive https://github.com/ltdoanhwork/video_gen_physics.git
+git clone --recursive https://github.com/ltdoanhwork/RoboWorM.git
 # or, in an existing clone:
 git submodule update --init --recursive
 # only the ones you need, e.g. the motion metrics:

@@ -58,11 +58,11 @@ asking a VLM judge.
 
 Latest metric updates:
 
-- **KIVA** ([#14](https://github.com/ltdoanhwork/video_gen_physics/pull/14)): two-command
+- **KIVA** ([#14](https://github.com/ltdoanhwork/RoboWorM/pull/14)): two-command
   CLI (`kinescore calibrate`, `kinescore score`) with fixed per-robot thresholds shipped in
   [metrics/kiva/thresholds/](metrics/kiva/thresholds/). See
   [metrics/kiva/README.md](metrics/kiva/README.md).
-- **RIGIS** ([#13](https://github.com/ltdoanhwork/video_gen_physics/pull/13)): rewritten
+- **RIGIS** ([#13](https://github.com/ltdoanhwork/RoboWorM/pull/13)): rewritten
   README (method, input format, model service + scoring commands) and a refactored
   geometric-consistency scorer. See [metrics/rigis/README.md](metrics/rigis/README.md).
 
@@ -150,7 +150,7 @@ policy-in-the-loop, and the SVG kernel sources; see
 [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md#fetching-the-submodules)):
 
 ```bash
-git clone --recursive https://github.com/ltdoanhwork/video_gen_physics.git
+git clone --recursive https://github.com/ltdoanhwork/RoboWorM.git
 # existing clone: git submodule update --init --recursive
 ```
 
