@@ -17,8 +17,8 @@
 </div>
 
 Code, data pointers and run scripts for **RoboWorM**, a physics audit for robot video
-world models and the training-free methods that accelerate them. Interactive figures,
-tables and rollout videos are on the **[project page](https://roboworm.github.io/roboworm/)**.
+world models and the training-free methods that accelerate them. Rollout videos and
+interactive demos are on the **[project page](https://roboworm.github.io/roboworm/)**.
 
 [![RoboWorM overview](docs/assets/figures/overview.png)](https://roboworm.github.io/roboworm/#abstract)
 
@@ -161,13 +161,9 @@ bash scripts/run/ctrlworld/run_bimanual_multiview_ctrlworld_4view_grid.sh      #
 - 9 methods, (cell × method) configs, speedup protocol: [docs/acceleration/README.md](docs/acceleration/README.md)
 - How each method hooks into each backbone: [methods/README.md](methods/README.md)
 
-[![Dense world-model results](docs/assets/figures/dense_results.png)](https://roboworm.github.io/roboworm/#models)
-
 [![Speedup vs physical audit](docs/assets/figures/speedup_tradeoff.png)](https://roboworm.github.io/roboworm/#acceleration)
 
-*Top: dense results for every cell (Markovian / non-Markovian). Bottom: speedup over dense vs
-physical audit for every method on the bimanual cells. Interactive versions on the
-[project page](https://roboworm.github.io/roboworm/#acceleration).*
+*Speedup over dense vs physical audit for every method on the bimanual cells.*
 
 ## 5. Metrics
 
