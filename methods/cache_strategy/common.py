@@ -130,7 +130,8 @@ class BSCConfig:
     output_gate: bool = True          # gate on s*E_I (output space), not raw E_I
     # --- groups (3.1) ---
     group_size: int = 4
-    group_predict: str = "io"         # "io" = members copy, leader maps I->O; "block"
+    group_predict: str = "block"      # "block" = per-block chain (leader decides, every member
+                                      # predicts O^a + (I - I^a)); "io" = LEGACY zero-order hold
     group_bounds: str | None = None   # non-uniform, e.g. "0-1,2-5,6-9"; None = uniform
     # --- protection ---
     protect_first_n: int = 0

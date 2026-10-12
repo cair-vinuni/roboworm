@@ -102,7 +102,7 @@ def add_dreamgen_cache_args(parser: argparse.ArgumentParser):
     group.set_defaults(bsc_output_gate=True)
     # groups
     group.add_argument("--bsc-group-size", type=int, default=4, help="Contiguous DiT blocks per skip-group (1 = per-block).")
-    group.add_argument("--bsc-group-predict", type=str, default="io", choices=["io", "block", "io_vel"], help="'io' = intermediate members reuse their cached output; 'block' = each predicts.")
+    group.add_argument("--bsc-group-predict", type=str, default="block", choices=["io", "block", "io_vel"], help="'block' (default) = leader decides, every member predicts O^a + (I - I^a) on its own input (per-block chain, paper eq.); 'io' / 'io_vel' = LEGACY zero-order hold (members return cached outputs; ablation only).")
     group.add_argument("--bsc-group-bounds", type=str, default=None, help="Non-uniform groups as 'a-b,c-d,...' (inclusive block indices). Overrides --bsc-group-size.")
     # protection
     group.add_argument("--bsc-protect-first-n", type=int, default=0, help="Force full compute for groups covering the first N blocks (the unstable head).")
@@ -244,7 +244,7 @@ def build_cache_runtime_config(setup_args: Any) -> CacheRuntimeConfig | None:
             warmup_steps=getattr(setup_args, "bsc_warmup_steps", 3),
             output_gate=getattr(setup_args, "bsc_output_gate", True),
             group_size=getattr(setup_args, "bsc_group_size", 4),
-            group_predict=getattr(setup_args, "bsc_group_predict", "io"),
+            group_predict=getattr(setup_args, "bsc_group_predict", "block"),
             group_bounds=getattr(setup_args, "bsc_group_bounds", None),
             protect_first_n=getattr(setup_args, "bsc_protect_first_n", 0),
             protect_last_frac=getattr(setup_args, "bsc_protect_last_frac", 0.0),
