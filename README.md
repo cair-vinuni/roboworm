@@ -122,7 +122,9 @@ Every dataset, rollout and checkpoint repo is grouped in the **[RoboWorM Hugging
 |---|---|---|
 | source / training data (LeRobot) | [`vgp_datasets`](https://huggingface.co/datasets/doanh25032004/vgp_datasets) | `datasets/` |
 | benchmark rollouts (dense + 9 methods) | [`video_gen_physics`](https://huggingface.co/datasets/doanh25032004/video_gen_physics) | `sampling_dataset/` |
-| base, metric and fine-tuned weights | `vgp_checkpoints_*`, `vgp_exp_logs` | `checkpoints/` |
+| base, metric and fine-tuned weights | `vgp_checkpoints_*`, [`vgp_exp_logs`](https://huggingface.co/doanh25032004/vgp_exp_logs) | `checkpoints/` |
+
+All repos are in the HF collection [RoboWorM](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578).
 
 ```bash
 export HF_HUB_DISABLE_XET=1
@@ -130,9 +132,21 @@ hf download doanh25032004/vgp_datasets      --repo-type dataset --local-dir data
 hf download doanh25032004/video_gen_physics --repo-type dataset --local-dir sampling_dataset --include "dense/*"
 ```
 
+All fine-tuned DreamGen and DreamDojo checkpoints are only on HF (`vgp_exp_logs`). Download a
+cell before you run its launcher. For example, DreamGen humanoid SV writes to
+`checkpoints/finetuned/dreamgen/posttraining/singleview/humanoid_singleview_16fps/`:
+
+```bash
+mkdir -p exp_logs checkpoints/finetuned/dreamgen checkpoints/finetuned/dreamdojo
+[ -e exp_logs/dreamgen_logs ]  || ln -s ../checkpoints/finetuned/dreamgen  exp_logs/dreamgen_logs
+[ -e exp_logs/dreamdojo_logs ] || ln -s ../checkpoints/finetuned/dreamdojo exp_logs/dreamdojo_logs
+hf download doanh25032004/vgp_exp_logs --local-dir exp_logs \
+  --include 'dreamgen_logs/posttraining/singleview/humanoid_singleview_16fps/*'
+```
+
 - All download commands, the expected tree and a sanity check: [docs/datasets/download.md](docs/datasets/download.md)
 - Corpora, splits and layout: [docs/datasets/README.md](docs/datasets/README.md), [docs/datasets/sampling_dataset.md](docs/datasets/sampling_dataset.md)
-- Checkpoint of every cell and how to restore it: [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md)
+- Checkpoint of every cell, the launcher path it expects and its `hf download` command: [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md)
 
 ## 3. Training
 

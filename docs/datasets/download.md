@@ -19,7 +19,7 @@ export HF_HUB_DISABLE_XET=1     # the Xet backend fails on parallel filesystems
 | benchmark rollouts | `doanh25032004/video_gen_physics` (dataset) | `sampling_dataset` | `metrics.evaluate`, `scripts/metrics/`, `assets/scripts/`; launchers write new rollouts here |
 | base weights | `doanh25032004/vgp_checkpoints_{nvidia,dreamdojo,google_t5}` (model) | `checkpoints/base/{nvidia,dreamdojo,google-t5}` | all model launchers |
 | other base + metric weights | `doanh25032004/vgp_checkpoints_own` (model) | `checkpoints`, then re-layout | Ctrl-World, FVD I3D, WorldScore probes (KIVA / RIGIS weights: see CHECKPOINTS.md, Metrics) |
-| our fine-tuned weights | `doanh25032004/vgp_exp_logs` (model) | `exp_logs`, then re-layout | every fine-tuned cell (`checkpoints/finetuned/...`) |
+| our fine-tuned weights | `doanh25032004/vgp_exp_logs` (model) | `exp_logs` (with the `*_logs` -> `checkpoints/finetuned/*` symlinks) | every fine-tuned cell (`checkpoints/finetuned/...`); per-cell commands in [CHECKPOINTS.md](../../checkpoints/CHECKPOINTS.md#restore-a-fine-tuned-checkpoint-rows-5-11) |
 
 The re-layout snippet for the last two rows is in
 [checkpoints/CHECKPOINTS.md](../../checkpoints/CHECKPOINTS.md#restore-from-huggingface).

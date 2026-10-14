@@ -18,6 +18,14 @@ The layout was introduced on 2026-10-05. The old paths are kept as compat symlin
 `exp_logs/ctrlworld_logs -> ../checkpoints/finetuned/ctrlworld`, ...), so old
 commands keep working. New code should use the new paths.
 
+**All fine-tuned DreamGen and DreamDojo checkpoints (rows 5-11) are on Hugging Face**
+in [`doanh25032004/vgp_exp_logs`](https://huggingface.co/doanh25032004/vgp_exp_logs).
+Since 2026-10-14 they are no longer stored on the lab server. Every file was sha256-checked
+against HF before it was deleted. Download a cell before you run its launcher; see
+[Restore a fine-tuned checkpoint](#restore-a-fine-tuned-checkpoint-rows-5-11).
+The Ctrl-World checkpoints (rows 1-3) are still on disk. All RoboWorM repos are listed in the HF collection
+[RoboWorM](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578).
+
 ## Paper cells (Table C1)
 
 One row per generation cell. "Launcher" is the dense script that loads the
@@ -43,6 +51,49 @@ The table covers the 12 cells of Table C1. Ctrl-World uses 3 views on single_arm
 and a 4-view 2x2 grid on bimanual and humanoid (rows 2 and 3). DreamDojo launchers take
 the parent `checkpoints/` dir and read `latest_checkpoint.txt`. DreamGen launchers take
 `checkpoints_40_per/` and an `ITER_NAME`.
+
+## Restore a fine-tuned checkpoint (rows 5-11)
+
+HF stores the runs under the old `exp_logs/` names: `dreamgen_logs/` maps to
+`checkpoints/finetuned/dreamgen/` and `dreamdojo_logs/` maps to `checkpoints/finetuned/dreamdojo/`.
+Create the two compat symlinks once (`exp_logs/` is not tracked by git). After that,
+`hf download --local-dir exp_logs` writes each file to the exact path the launcher reads.
+Run this from the repo root:
+
+```bash
+export HF_HUB_DISABLE_XET=1
+mkdir -p exp_logs checkpoints/finetuned/dreamgen checkpoints/finetuned/dreamdojo
+[ -e exp_logs/dreamgen_logs ]  || ln -s ../checkpoints/finetuned/dreamgen  exp_logs/dreamgen_logs
+[ -e exp_logs/dreamdojo_logs ] || ln -s ../checkpoints/finetuned/dreamdojo exp_logs/dreamdojo_logs
+get() { hf download doanh25032004/vgp_exp_logs --repo-type model --local-dir exp_logs "$@"; }
+```
+
+| # | cell | command (full run dir, exact server layout) | size |
+|---|---|---|---|
+| 5 | DreamGen bimanual MV | `get --include 'dreamgen_logs/posttraining/multiview/bimanual_multiview_seg16/*'` | 11.8G |
+| 6 | DreamGen humanoid MV | `get --include 'dreamgen_logs/posttraining/multiview/humanoid_multiview_seg16/*'` | 23.6G |
+| 7 | DreamGen single_arm SV | `get --include 'dreamgen_logs/posttraining/singleview/single_arm_static_singleview_16fps_v2/*'` | 11.8G |
+| 8 | DreamGen bimanual SV | `get --include 'dreamgen_logs/posttraining/singleview/bimanual_singleview_16fps/*'` | 23.6G |
+| 9 | DreamGen humanoid SV | `get --include 'dreamgen_logs/posttraining/singleview/humanoid_singleview_16fps/*'` | 23.6G |
+| 10 | DreamDojo single_arm SV | `get --include 'dreamdojo_logs/dreamdojo/exp_single_arm_sv/single_arm_singleview/*' --exclude '*/iter_000010000/*' '*/iter_000020000/*'` | 21.5G |
+| 11 | DreamDojo bimanual SV | `get --include 'dreamdojo_logs/dreamdojo/exp_aloha_resume70k/aloha_bimanual_singleview_full/*'` | 21.5G |
+
+The files land at the checkpoint paths in the table above. Inference needs only the weights,
+not the optimizer state. For a DreamGen cell, download just the iter that the launcher loads
+(`<run>` and `<iter>` come from rows 5-9):
+
+```bash
+R=dreamgen_logs/posttraining/singleview/humanoid_singleview_16fps; I=iter_000090000   # row 9
+get --include "$R/config.yaml" "$R/checkpoints_40_per/latest_checkpoint.txt" "$R/checkpoints_40_per/model/$I.pt"
+```
+
+For a DreamDojo cell, you can skip the optimizer shards with `--exclude '*/optim/*'`.
+DreamDojo resolves the iter from `latest_checkpoint.txt`, so always download that file too.
+
+Extra iters on disk before the offload, not loaded by any launcher: `humanoid_multiview_seg16`
+`iter_000090000`, `bimanual_singleview_16fps` `iter_000100000`, and `humanoid_singleview_16fps`
+`iter_000120000`. The last one is the run's `latest_checkpoint.txt`, so the launcher pins
+`ITER_NAME=iter_000090000`. The full-dir commands above download them.
 
 ## Base models (`checkpoints/base/`)
 
@@ -80,12 +131,20 @@ see `models/dreamgen/imaginaire/constants.py`). DreamDojo looks for HF mirrors i
 | `vggt_omega/vggt_omega_1b_512.pt` | 4.3G | RIGIS (symlink to `thanhnv/VideoWorldModelBenchmark/checkpoint/`) |
 | `kiva/` | 1.1G | KIVA readers (symlink to `triquang/kinescore-store/ckpt`) |
 
-## Not released (not used by any paper cell)
+## Not used by any paper cell (HF only)
 
-Intermediate or superseded weights that no paper cell loads:
-DreamDojo `exp_aloha_resume40k`
-(training-only init of cell 11), DreamDojo `exp_single_arm_sv` iters 10000/20000,
-DreamGen `single_arm_static_singleview_16fps_v1_90k`, `nvidia/PhysicalAI-Robotics-GR00T-Eval`.
+Intermediate or superseded fine-tunes. No paper cell loads them. They were archived under
+`tmp/20261005_refactor/checkpoints_unused/` and deleted on 2026-10-14 after verification.
+They are kept on HF in `vgp_exp_logs`. Restore them with the `get` helper above:
+
+| run | HF path (`vgp_exp_logs`) | size |
+|---|---|---|
+| DreamDojo `exp_aloha_resume40k` (training-only init of row 11) | `dreamdojo_logs/dreamdojo/exp_aloha_resume40k/` | 21.5G |
+| DreamDojo `exp_single_arm_sv` iters 10000 / 20000 | `dreamdojo_logs/dreamdojo/exp_single_arm_sv/single_arm_singleview/checkpoints/iter_0000{1,2}0000/` | 2 x 21.5G |
+| DreamGen `single_arm_static_singleview_16fps_v1_90k` (superseded by `_v2`) | `dreamgen_logs/posttraining/singleview/single_arm_static_singleview_16fps_v1_90k/` | 11.9G |
+
+`nvidia/PhysicalAI-Robotics-GR00T-Eval` (base, 344M) is also unused. It is still in
+`tmp/20261005_refactor/checkpoints_unused/base/`.
 
 ### Removed: 3-view Ctrl-World bimanual / humanoid (2026-10-08)
 
@@ -117,7 +176,8 @@ reads them.
 ## Restore from HuggingFace
 
 See [docs/setup/hf_backup_restore.md](../docs/setup/hf_backup_restore.md) for prerequisites
-(`HF_HUB_DISABLE_XET=1`, token). The repos are `doanh25032004/<name>`:
+(`HF_HUB_DISABLE_XET=1`, token). The repos are `doanh25032004/<name>` and are listed in the
+[RoboWorM collection](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578):
 
 | HF repo | restores |
 |---|---|
@@ -125,7 +185,10 @@ See [docs/setup/hf_backup_restore.md](../docs/setup/hf_backup_restore.md) for pr
 | `vgp_checkpoints_dreamdojo` | `checkpoints/base/dreamdojo` |
 | `vgp_checkpoints_google_t5` | `checkpoints/base/google-t5` |
 | `vgp_checkpoints_own` | `checkpoints/{ctrl_world,pi05_droid,stabilityai,openai,worldscore,droid,mjcf,meta-llama,...}` (old layout) |
-| `vgp_exp_logs` | `exp_logs/{ctrlworld_logs,dreamdojo_logs,dreamgen_logs,...}` (old layout) |
+| `vgp_exp_logs` | `exp_logs/{ctrlworld_logs,dreamdojo_logs,dreamgen_logs,...}` (old layout; `*_logs` resolve to `checkpoints/finetuned/*` via the symlinks above) |
+
+For a single fine-tuned cell, use [the per-cell commands](#restore-a-fine-tuned-checkpoint-rows-5-11)
+instead. The full `vgp_exp_logs` download is about 300G.
 
 ```bash
 export HF_HUB_DISABLE_XET=1
@@ -152,7 +215,7 @@ for n in fvd worldscore vggt_omega; do
 done
 cd ../exp_logs
 for k in ctrlworld dreamdojo dreamgen; do
-  [ -d "${k}_logs" ] && [ ! -L "${k}_logs" ] && mv "${k}_logs" "../checkpoints/finetuned/$k"
+  [ -d "${k}_logs" ] && [ ! -L "${k}_logs" ] && [ ! -e "../checkpoints/finetuned/$k" ] && mv "${k}_logs" "../checkpoints/finetuned/$k"
   [ -e "../checkpoints/finetuned/$k" ] && [ ! -e "${k}_logs" ] && ln -s "../checkpoints/finetuned/$k" "${k}_logs"
 done
 mkdir -p ../logs/exp_logs

@@ -1,8 +1,19 @@
 # Backup & Restore — video_gen_physics on HuggingFace
 
 Full backup of this workspace lives on the Hub under user **`doanh25032004`**
-(all repos **public**). This file is the map: what is where, how to pull it back,
+(all repos **public**). All repos are grouped in the HF collection
+[RoboWorM](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578).
+This file is the map: what is where, how to pull it back,
 and what has to be rebuilt by hand (virtualenvs, secrets).
+
+Some trees are kept **only on HF**. They were deleted from the lab server after each file was
+sha256-checked against HF:
+- `datasets/` (2026-10-08)
+- the 3-view Ctrl-World fine-tunes (2026-10-08)
+- all fine-tuned DreamGen / DreamDojo checkpoints (`checkpoints/finetuned/{dreamgen,dreamdojo}`, 2026-10-14)
+
+To get one fine-tuned cell back, use the per-cell commands in
+[checkpoints/CHECKPOINTS.md](../../checkpoints/CHECKPOINTS.md#restore-a-fine-tuned-checkpoint-rows-5-11).
 
 Scripts that produced it:
 
