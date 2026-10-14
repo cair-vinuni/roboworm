@@ -35,8 +35,11 @@ The 4-view grids (rows 2 and 3) were warm-started from 3-view Ctrl-World fine-tu
 Those 3-view checkpoints and their prepare/train scripts were removed on 2026-10-08; the
 checkpoints are on HF (`doanh25032004/vgp_exp_logs`, restore commands in
 [checkpoints/CHECKPOINTS.md](../../checkpoints/CHECKPOINTS.md#removed-3-view-ctrl-world-bimanual--humanoid-2026-10-08)),
-the scripts in git history. DreamDojo `exp_aloha_resume40k` is a training-only stepping stone
-(not released).
+the scripts in git history. DreamDojo `exp_aloha_resume40k` is a training-only stepping stone.
+It is not loaded by any cell and is kept only on HF (`vgp_exp_logs`,
+`dreamdojo_logs/dreamdojo/exp_aloha_resume40k/`). All fine-tuned DreamGen and DreamDojo
+outputs listed above are also only on HF. Restore them with the per-cell commands in
+[checkpoints/CHECKPOINTS.md](../../checkpoints/CHECKPOINTS.md#restore-a-fine-tuned-checkpoint-rows-5-11).
 
 ## DreamGen (Cosmos-Predict2 2B Video2World)
 
