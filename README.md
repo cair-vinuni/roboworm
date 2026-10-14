@@ -10,6 +10,7 @@
 <a href="https://roboworm.github.io/roboworm/"><img src="https://img.shields.io/badge/RoboWorM-Website-4c9a2a?logo=googlechrome&logoColor=white&labelColor=555555" alt="Project page"></a>
 <a href="https://huggingface.co/datasets/doanh25032004/vgp_datasets"><img src="https://img.shields.io/badge/Dataset-Hugging%20Face-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="Dataset on Hugging Face"></a>
 <a href="https://huggingface.co/datasets/doanh25032004/video_gen_physics"><img src="https://img.shields.io/badge/Rollouts-Hugging%20Face-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="Rollouts on Hugging Face"></a>
+<a href="https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578"><img src="https://img.shields.io/badge/All%20assets-HF%20Collection-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="RoboWorM collection on Hugging Face"></a>
 <a href="#citation"><img src="https://img.shields.io/badge/BibTeX-Cite-1f3a5f?labelColor=555555" alt="BibTeX"></a>
 
 <a href="https://roboworm.github.io/roboworm/#teaser"><img src="docs/assets/figures/teaser.jpg" alt="RoboWorM" width="90%"></a>
@@ -114,6 +115,8 @@ Hugging Face downloads on parallel filesystems.
 ## 2. Data and checkpoints
 
 [![Benchmark composition](docs/assets/figures/dataset_composition.png)](https://roboworm.github.io/roboworm/#benchmark)
+
+Every dataset, rollout and checkpoint repo is grouped in the **[RoboWorM Hugging Face collection](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578)**.
 
 | download | HF repo | put it in |
 |---|---|---|
