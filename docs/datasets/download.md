@@ -11,6 +11,8 @@ export HF_HUB_DISABLE_XET=1     # the Xet backend fails on parallel filesystems
 
 `hf download` is the current name of `huggingface-cli download`; both take the same arguments.
 
+All repos below are grouped in the **[RoboWorM Hugging Face collection](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578)**.
+
 ## Where each download goes
 
 | download | HF repo (type) | `--local-dir` | read by |
