@@ -49,7 +49,7 @@ See the [project page](https://roboworm.github.io/roboworm/#fig6) for the rollou
 ## Contents
 
 - [Proposed metrics: KIVA and RIGIS](#proposed-metrics-kiva-and-rigis)
-- [Quick start](#quick-start)
+- [How to use the benchmark](#how-to-use-the-benchmark)
 - [1. Installation](#1-installation)
 - [2. Data and checkpoints](#2-data-and-checkpoints)
 - [3. Training](#3-training)
@@ -71,14 +71,33 @@ robot: its kinematic tree and its fixed camera rig.
 | **KIVA** (Kinematic Invariant Violation Assessment) | Single view: reads 3-D robot keypoints from the pixels, measures link-rigidity error and joint jerk, calibrated against real footage. | [README](metrics/kiva/README.md) · [setup](docs/metrics/kiva.md) · [#14](https://github.com/ltdoanhwork/RoboWorM/pull/14) |
 | **RIGIS** (Robotic Inter-view Geometry & Intrinsic-Extrinsic Stability) | Multi view: VGGT-Ω lifts every view to depth + cameras and scores cross-view geometry (S_geo) and camera-rig stability (S_pose). | [README](metrics/rigis/README.md) · [setup](docs/metrics/rigis.md) · [#13](https://github.com/ltdoanhwork/RoboWorM/pull/13) |
 
-## Quick start
+## How to use the benchmark
 
-| goal | what to do | guide |
-|---|---|---|
-| **Score released rollouts** (or reproduce the numbers) | download `sampling_dataset/`, run `python -m metrics.evaluate` | [docs/usage.md](docs/usage.md#a-score-released-rollouts) |
-| **Evaluate your own world model** | roll out from the released inputs, save in the `sampling_dataset/` layout, score | [docs/usage.md](docs/usage.md#b-evaluate-your-own-world-model) |
-| **Benchmark an acceleration method** | copy a dense launcher, add your flags, time + score against dense | [docs/usage.md](docs/usage.md#c-benchmark-an-acceleration-method) |
-| **Use KIVA / RIGIS alone** | `kinescore score ...` / `run_video_metrics ...` on any robot video | [docs/usage.md](docs/usage.md#kiva-and-rigis-on-any-robot-video) |
+RoboWorM is used in four ways. None needs training: every fine-tuned checkpoint and
+every rollout is released.
+
+**1. Score released rollouts.** Download a cell from
+[`video_gen_physics`](https://huggingface.co/datasets/doanh25032004/video_gen_physics)
+into `sampling_dataset/`, then score it with `python -m metrics.evaluate`. This also
+reproduces the benchmark numbers.
+→ [docs/usage.md](docs/usage.md#a-score-released-rollouts)
+
+**2. Evaluate your own world model.** Take the conditioning inputs of each episode from
+`sampling_dataset/dense/<embodiment>/input/`, roll out to the full episode length, save
+the videos in the same `sampling_dataset/` layout under your model's name, and score them
+with the same metrics. Your numbers are then directly comparable with the released ones.
+→ [docs/usage.md](docs/usage.md#b-evaluate-your-own-world-model),
+[docs/extending/new_world_model.md](docs/extending/new_world_model.md)
+
+**3. Benchmark an acceleration method.** Copy the dense launcher of a cell, add only your
+method flags, time it against the dense run on the same GPU, and score its fidelity to
+dense plus KIVA / RIGIS.
+→ [docs/usage.md](docs/usage.md#c-benchmark-an-acceleration-method),
+[docs/extending/new_acceleration_method.md](docs/extending/new_acceleration_method.md)
+
+**4. Use KIVA or RIGIS alone** on any robot video: `kinescore score` for single-view
+kinematics, `run_video_metrics` for multi-view geometry.
+→ [metrics/kiva/README.md](metrics/kiva/README.md), [metrics/rigis/README.md](metrics/rigis/README.md)
 
 ```bash
 PY=models/dreamgen/.venv/bin/python
