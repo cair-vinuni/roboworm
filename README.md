@@ -20,12 +20,14 @@
 
 ## Latest updates
 
-| date | update |
-|---|---|
-| 2026-10-24 | Paper released on arXiv: [arXiv:2610.33807](https://arxiv.org/abs/2610.33807). |
-| 2026-10 | The short version is accepted as a **Spotlight** at the *Do Robots Need World Models?* workshop, CoRL 2026. |
-| 2026-10-09 | Code release `v1.0.0`: benchmark, KIVA / RIGIS metrics, 9 acceleration methods, launchers for all 12 cells. |
-| 2026-10 | Data, rollouts and checkpoints on Hugging Face: [RoboWorM collection](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578). |
+- 📄 **`2026.10.24`** — Paper released on arXiv:
+  [![arXiv](https://img.shields.io/badge/arXiv-2610.33807-b31b1b?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2610.33807)
+- 🌟 **`2026.10`** — The short version is accepted as a **Spotlight** at
+  ***Do Robots Need World Models?*** · **CoRL 2026 Workshop** 🎉
+- 🤗 **`2026.10`** — Data, rollouts and checkpoints released on Hugging Face:
+  [![HF collection](https://img.shields.io/badge/🤗%20RoboWorM-Collection-ffcc4d)](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578)
+- 🚀 **`2026.10.09`** — Code release **`v1.0.0`**: benchmark, 🧭 KIVA / 📐 RIGIS metrics,
+  ⚡ 9 acceleration methods and launchers for all 12 cells.
 
 Code, data pointers and run scripts for **RoboWorM**, a physics audit for robot video
 world models and the training-free methods that accelerate them. Rollout videos and
