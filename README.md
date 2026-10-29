@@ -2,11 +2,9 @@
 
 <img src="docs/assets/figures/logo.png" alt="RoboWorM logo" width="96">
 
-# RoboWorM: Evaluating Movement Realism, Consistency and Acceleration Effects in Embodied Video World Models
+# RoboWorM: Evaluating Movement Realism, Consistency and Acceleration Affects in Embodied Video World Models
 
-<!-- Paper badge hidden until the arXiv version is public:
-<a href="https://roboworm.github.io/roboworm/"><img src="https://img.shields.io/badge/cs.CV-Paper-b31b1b?logo=arxiv&logoColor=white&labelColor=555555" alt="Paper"></a>
--->
+<a href="https://arxiv.org/abs/2610.33807"><img src="https://img.shields.io/badge/arXiv-2610.33807-b31b1b?logo=arxiv&logoColor=white&labelColor=555555" alt="arXiv"></a>
 <a href="https://roboworm.github.io/roboworm/"><img src="https://img.shields.io/badge/RoboWorM-Website-4c9a2a?logo=googlechrome&logoColor=white&labelColor=555555" alt="Project page"></a>
 <a href="https://huggingface.co/datasets/doanh25032004/vgp_datasets"><img src="https://img.shields.io/badge/Dataset-Hugging%20Face-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="Dataset on Hugging Face"></a>
 <a href="https://huggingface.co/datasets/doanh25032004/video_gen_physics"><img src="https://img.shields.io/badge/Rollouts-Hugging%20Face-d4a017?logo=huggingface&logoColor=yellow&labelColor=555555" alt="Rollouts on Hugging Face"></a>
@@ -16,6 +14,18 @@
 <a href="https://roboworm.github.io/roboworm/#teaser"><img src="docs/assets/figures/teaser.jpg" alt="RoboWorM" width="90%"></a>
 
 </div>
+
+> 🌟 The short version is accepted as a **Spotlight** at
+> [*Do Robots Need World Models?*](https://roboworm.github.io/roboworm/) – CoRL 2026 Workshop.
+
+## Latest updates
+
+| date | update |
+|---|---|
+| 2026-10-24 | Paper released on arXiv: [arXiv:2610.33807](https://arxiv.org/abs/2610.33807). |
+| 2026-10 | The short version is accepted as a **Spotlight** at the *Do Robots Need World Models?* workshop, CoRL 2026. |
+| 2026-10-09 | Code release `v1.0.0`: benchmark, KIVA / RIGIS metrics, 9 acceleration methods, launchers for all 12 cells. |
+| 2026-10 | Data, rollouts and checkpoints on Hugging Face: [RoboWorM collection](https://huggingface.co/collections/doanh25032004/roboworm-6acf553906401bef19d99578). |
 
 Code, data pointers and run scripts for **RoboWorM**, a physics audit for robot video
 world models and the training-free methods that accelerate them. Rollout videos and
@@ -48,6 +58,7 @@ See the [project page](https://roboworm.github.io/roboworm/#fig6) for the rollou
 
 ## Contents
 
+- [Latest updates](#latest-updates)
 - [Proposed metrics: KIVA and RIGIS](#proposed-metrics-kiva-and-rigis)
 - [How to use the benchmark](#how-to-use-the-benchmark)
 - [1. Installation](#1-installation)
@@ -248,13 +259,15 @@ docs/              setup, datasets, training, inference, acceleration, metrics, 
 ## Citation
 
 ```bibtex
-@inproceedings{roboworm2027,
-  title     = {RoboWorM: Evaluating Movement Realism, Consistency and Acceleration Effects in Embodied Video World Models},
-  author    = {Anonymous},
-  booktitle = {International Conference on Learning Representations (ICLR)},
-  year      = {2027},
-  note      = {Under review},
-  url       = {https://roboworm.github.io/roboworm/}
+@article{lethien2026roboworm,
+  title   = {RoboWorM: Evaluating Movement Realism, Consistency and Acceleration Affects in Embodied Video World Models},
+  author  = {Le Thien, Doanh and Nguyen, Viet-Thanh and Pham, Tri Quang and Pham, Nhi and Wewer, Christopher and
+             Nguyen, Minh-Loi and Tran, Hoang H. and Le, Tho and Luu, Tung M. and Le, Dung D. and Duong, Vu N. and
+             Fischer, Jonas and Le, Ngan and Le, An Thai and Sonntag, Daniel and Lee, Gim Hee and Zou, James and
+             Niepert, Mathias and Peters, Jan and Nguyen, Duy M. H. and Vien, Ngo Anh},
+  journal = {arXiv preprint arXiv:2610.33807},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2610.33807}
 }
 ```
 
